@@ -6,6 +6,11 @@ and an emoji picker. It also **runs Raycast extensions** natively, in JavaScript
 SwiftUI + AppKit, running as an accessory with no Dock icon (`LSUIElement`). Zero third-party
 dependencies.
 
+> **This checkout is a fork.** [CUSTOM.md](CUSTOM.md) covers what is true here and not upstream —
+> the `main`/`custom` branch split (never commit to `main`), the periodic upstream sync, the local
+> build and signing setup, and the register of changes this fork carries. Read it before your first
+> commit; everything below still applies unchanged.
+
 ## Posture: latest-only, always
 
 **Tinycast targets one macOS — the current stable release — and nothing else.** macOS 26+, the Xcode 26
@@ -46,6 +51,7 @@ system-wide chord, and HIToolbox's TIS APIs remain the public input-source mecha
 
 | Read it before you | Doc |
 | --- | --- |
+| commit anything in this fork — branching, upstream sync, local build | [CUSTOM.md](CUSTOM.md) |
 | change how anything is wired or owned | [architecture.md](docs/architecture.md) |
 | write Swift — naming, style, concurrency, budgets, comments | [standards.md](docs/standards.md) |
 | claim a change is done | [testing.md](docs/testing.md) |
