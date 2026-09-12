@@ -145,10 +145,15 @@ Custom Tinycast extensions are **not** built here. They live one per folder unde
 `~/Developer/tinycast_addons/extensions/`, each self-contained — manifest, sources, build script and
 installer in the same directory, with nothing above it.
 
-| Extension | Does |
-| --- | --- |
-| [`fork-sync`](../tinycast_addons/extensions/fork-sync/README.md) | This fork's drift from upstream, its patches, and a run-the-sync action. Its README is the shared build loop and the `ext-test` recipe. |
-| [`copy-path`](../tinycast_addons/extensions/copy-path/README.md) | Copies the frontmost app's target: Finder's selection as paths, a browser's page URL. |
+That workspace is its own git repo, `github.com/jhasubhash/tinycast_addons`, holding 13 extensions —
+two written for Tinycast (`fork-sync`, `copy-path`) and eleven ported from
+`~/Documents/automations/Raycast/Extensions/`. Every one builds with a single esbuild line in its
+`package.json`; [`fork-sync`'s README](../tinycast_addons/extensions/fork-sync/README.md) is the
+shared build loop and the `ext-test` recipe.
+
+The one thing a port has to get right: `@raycast/api`, `react`, `react-dom` and the JSX runtimes are
+injected by the runtime and stay external, but **`@raycast/utils` is not provided and must be
+bundled**. Externalising it yields a command that boots and then fails on its first hook.
 
 Keeping them out is deliberate: an extension is a Raycast-format package that Tinycast loads from
 `~/Library/Application Support/<bundle id>/extensions/`, not something the app compiles. Putting one
