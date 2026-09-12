@@ -176,7 +176,9 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
         guard let path = commandIconPath(command, in: owner) ?? owner.iconPath else {
             return .symbol("puzzlepiece.extension")
         }
-        return .artwork(path: path, extent: ExtensionIconCache.extent)
+        return .artwork(
+            path: path, extent: ExtensionIconCache.extent,
+            stamp: ExtensionIconCache.stamp(atPath: path))
     }
 
     private func commandIconPath(_ command: ExtensionCommand, in owner: InstalledExtension) -> String? {

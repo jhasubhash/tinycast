@@ -30,9 +30,10 @@ struct EntryIconTests {
             .tintedSymbol(name: "star", tint: red),
             .tintedSymbol(name: "star", tint: blue),
             .tintedSymbol(name: "bolt", tint: red),
-            .artwork(path: "/tmp/a.png", extent: 0.76),
-            .artwork(path: "/tmp/a.png", extent: 0.83),
-            .artwork(path: "/tmp/b.png", extent: 0.76)
+            .artwork(path: "/tmp/a.png", extent: 0.76, stamp: 0),
+            .artwork(path: "/tmp/a.png", extent: 0.83, stamp: 0),
+            .artwork(path: "/tmp/a.png", extent: 0.76, stamp: 1),
+            .artwork(path: "/tmp/b.png", extent: 0.76, stamp: 0)
         ]
         let printed = Set(icons.map { "\($0)" })
         expect(printed.count == icons.count, "each icon prints uniquely: \(printed.count)/\(icons.count)")
@@ -50,9 +51,13 @@ struct EntryIconTests {
             EntryIcon.symbol("star") != EntryIcon.tintedSymbol(name: "star", tint: red),
             "a tinted tile differs from the plain one")
         expect(
-            EntryIcon.artwork(path: "/tmp/a.png", extent: 0.76)
-                != EntryIcon.artwork(path: "/tmp/a.png", extent: 0.83),
+            EntryIcon.artwork(path: "/tmp/a.png", extent: 0.76, stamp: 0)
+                != EntryIcon.artwork(path: "/tmp/a.png", extent: 0.83, stamp: 0),
             "one file at two extents differs")
+        expect(
+            EntryIcon.artwork(path: "/tmp/a.png", extent: 0.76, stamp: 0)
+                != EntryIcon.artwork(path: "/tmp/a.png", extent: 0.76, stamp: 1),
+            "one artwork path at two stamps differs")
         expect(
             EntryIcon.file(stamp: 0) != EntryIcon.file(stamp: 1),
             "one file at two stamps differs")
@@ -94,8 +99,8 @@ struct EntryIconTests {
         guard let path = writePNG() else { return expect(false, "the fixture writes") }
         defer { try? FileManager.default.removeItem(at: path.deletingLastPathComponent()) }
 
-        let small = IconCache.icon(for: .artwork(path: path.path, extent: 0.60), fileURL: path)
-        let large = IconCache.icon(for: .artwork(path: path.path, extent: 0.90), fileURL: path)
+        let small = IconCache.icon(for: .artwork(path: path.path, extent: 0.60, stamp: 0), fileURL: path)
+        let large = IconCache.icon(for: .artwork(path: path.path, extent: 0.90, stamp: 0), fileURL: path)
 
         guard let smallInk = inkExtent(small), let largeInk = inkExtent(large) else {
             return expect(false, "both artwork sizes rasterize")
@@ -144,6 +149,57 @@ struct EntryIconTests {
             "the moved stamp misses the bitmap decoded before the change")
     }
 
+    /// The same bug one case over: an extension reinstalled in place keeps its path, so a
+    /// path-only artwork key served the icon it had just replaced until the app was restarted.
+    static func replacedArtworkRetiresTheCachedBitmap() {
+        guard let path = writePNG(.red) else { return expect(false, "the fixture writes") }
+        defer { try? FileManager.default.removeItem(at: path.deletingLastPathComponent()) }
+
+        let cold = FileIconStamp.value(for: URL(fileURLWithPath: path.path))
+        let red = bitmap(
+            IconCache.icon(for: .artwork(path: path.path, extent: 0.76, stamp: cold), fileURL: path))
+        expect(red != nil, "the first decode rasterizes")
+
+        guard writePNG(.blue, at: path) != nil else { return expect(false, "the fixture repaints") }
+        let warm = FileIconStamp.value(for: URL(fileURLWithPath: path.path))
+        expect(warm != cold, "repainting the artwork moves its stamp")
+        expect(
+            IconCache.cached(.artwork(path: path.path, extent: 0.76, stamp: warm), fileURL: path) == nil,
+            "the moved stamp misses the bitmap decoded before the repaint")
+
+        let blue = bitmap(
+            IconCache.icon(for: .artwork(path: path.path, extent: 0.76, stamp: warm), fileURL: path))
+        expect(blue != nil && blue != red, "the replaced artwork paints, not the one it replaced")
+    }
+
+    /// Extensions ship `icon@dark.png` beside `icon.png`; a dark row that paints the light file
+    /// draws a black glyph on a black surface, which is what "the icon is missing" looks like.
+    static func darkSurfacePrefersTheDarkVariant() {
+        guard let light = writePNG(.red) else { return expect(false, "the fixture writes") }
+        defer { try? FileManager.default.removeItem(at: light.deletingLastPathComponent()) }
+        let darkPath = URL(fileURLWithPath: IconCache.darkVariantPath(of: light.path))
+        expect(darkPath.lastPathComponent == "fixture@dark.png", "the sibling is named @dark")
+        guard writePNG(.blue, at: darkPath) != nil else { return expect(false, "the sibling writes") }
+
+        let stamp = FileIconStamp.value(for: URL(fileURLWithPath: light.path))
+        let entry = EntryIcon.artwork(path: light.path, extent: 0.76, stamp: stamp)
+
+        IconCache.setDarkSurface(false)
+        let onLight = bitmap(IconCache.icon(for: entry, fileURL: light))
+        IconCache.setDarkSurface(true)
+        let onDark = bitmap(IconCache.icon(for: entry, fileURL: light))
+
+        expect(onLight != nil && onDark != nil, "both surfaces rasterize")
+        expect(onLight != onDark, "the dark surface paints the @dark sibling, not the light file")
+
+        // Without a sibling there is nothing to switch to, and the light file must still paint.
+        try? FileManager.default.removeItem(at: darkPath)
+        IconCache.invalidateStyled()
+        expect(
+            bitmap(IconCache.icon(for: entry, fileURL: light)) != nil,
+            "a missing sibling falls back to the light file")
+    }
+
     // MARK: - Helpers
 
     static func bitmap(_ image: NSImage) -> Data? { image.tiffRepresentation }
@@ -159,8 +215,9 @@ struct EntryIconTests {
         return url
     }
 
-    /// A red square filling its canvas, so fitting it to an extent is visible in the result.
-    static func writePNG() -> URL? {
+    /// A square filling its canvas, so fitting it to an extent is visible in the result. `at`
+    /// repaints an existing fixture, which is how an extension reinstall replaces its artwork.
+    static func writePNG(_ color: NSColor = .red, at existing: URL? = nil) -> URL? {
         let side = 256
         guard
             let rep = NSBitmapImageRep(
@@ -170,13 +227,17 @@ struct EntryIconTests {
         else { return nil }
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = ctx
-        NSColor.red.setFill()
+        color.setFill()
         NSRect(x: 0, y: 0, width: side, height: side).fill()
         NSGraphicsContext.restoreGraphicsState()
 
+        guard let data = rep.representation(using: .png, properties: [:]) else { return nil }
+        if let existing {
+            return (try? data.write(to: existing)) != nil ? existing : nil
+        }
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("entry-icon-test-\(UUID().uuidString)")
-        guard let data = rep.representation(using: .png, properties: [:]),
+        guard
             (try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true))
                 != nil
         else { return nil }
@@ -221,6 +282,8 @@ struct EntryIconTests {
         askingTwiceIsStable()
         cacheOnlyLookupMatchesTheDrawnIcon()
         aChangedIconRetiresTheCachedBitmap()
+        replacedArtworkRetiresTheCachedBitmap()
+        darkSurfacePrefersTheDarkVariant()
 
         print(failures == 0 ? "Entry icon tests passed" : "\(failures) tests failed")
         exit(failures == 0 ? 0 : 1)
