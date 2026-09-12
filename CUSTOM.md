@@ -139,6 +139,28 @@ codesign -dvv "build/DerivedData/Build/Products/Debug/Tinycast Dev.app" 2>&1 | g
 # Authority=Tinycast Self-Signed
 ```
 
+## Extensions live outside this repo
+
+Custom Tinycast extensions are **not** built here. They live in
+`~/Developer/tinycast_addons/`, which has its own
+[README](../tinycast_addons/README.md) covering the build and install loop.
+
+Keeping them out is deliberate: an extension is a Raycast-format package that Tinycast loads from
+`~/Library/Application Support/<bundle id>/extensions/`, not something the app compiles. Putting one
+in this tree would add a rebase conflict site for something the app never reads from here.
+
+Reach for a change in *this* repo only when the host itself is wrong — a `@raycast/api` component
+Tinycast renders badly, a missing Node shim, a runtime bug. Anything that is just "a thing I want
+Tinycast to do" is an extension, costs zero rebase surface, and survives every upstream release
+untouched.
+
+The fast way to test one, from this repo's root:
+
+```sh
+./Scripts/run-tests.sh ext-test
+"$TMPDIR/tinycast-harness/ext-test" ~/Developer/tinycast_addons/extensions/<name> <command>
+```
+
 ## Rules for a custom change
 
 1. **Commit on `custom`, never `main`.**
