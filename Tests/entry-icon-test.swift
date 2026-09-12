@@ -172,6 +172,34 @@ struct EntryIconTests {
         expect(blue != nil && blue != red, "the replaced artwork paints, not the one it replaced")
     }
 
+    /// Extensions ship `icon@dark.png` beside `icon.png`; a dark row that paints the light file
+    /// draws a black glyph on a black surface, which is what "the icon is missing" looks like.
+    static func darkSurfacePrefersTheDarkVariant() {
+        guard let light = writePNG(.red) else { return expect(false, "the fixture writes") }
+        defer { try? FileManager.default.removeItem(at: light.deletingLastPathComponent()) }
+        let darkPath = URL(fileURLWithPath: IconCache.darkVariantPath(of: light.path))
+        expect(darkPath.lastPathComponent == "fixture@dark.png", "the sibling is named @dark")
+        guard writePNG(.blue, at: darkPath) != nil else { return expect(false, "the sibling writes") }
+
+        let stamp = FileIconStamp.value(for: URL(fileURLWithPath: light.path))
+        let entry = EntryIcon.artwork(path: light.path, extent: 0.76, stamp: stamp)
+
+        IconCache.setDarkSurface(false)
+        let onLight = bitmap(IconCache.icon(for: entry, fileURL: light))
+        IconCache.setDarkSurface(true)
+        let onDark = bitmap(IconCache.icon(for: entry, fileURL: light))
+
+        expect(onLight != nil && onDark != nil, "both surfaces rasterize")
+        expect(onLight != onDark, "the dark surface paints the @dark sibling, not the light file")
+
+        // Without a sibling there is nothing to switch to, and the light file must still paint.
+        try? FileManager.default.removeItem(at: darkPath)
+        IconCache.invalidateStyled()
+        expect(
+            bitmap(IconCache.icon(for: entry, fileURL: light)) != nil,
+            "a missing sibling falls back to the light file")
+    }
+
     // MARK: - Helpers
 
     static func bitmap(_ image: NSImage) -> Data? { image.tiffRepresentation }
@@ -255,6 +283,7 @@ struct EntryIconTests {
         cacheOnlyLookupMatchesTheDrawnIcon()
         aChangedIconRetiresTheCachedBitmap()
         replacedArtworkRetiresTheCachedBitmap()
+        darkSurfacePrefersTheDarkVariant()
 
         print(failures == 0 ? "Entry icon tests passed" : "\(failures) tests failed")
         exit(failures == 0 ? 0 : 1)

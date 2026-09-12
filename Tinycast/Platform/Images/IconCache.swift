@@ -304,7 +304,7 @@ enum IconCache {
     static func artwork(atPath path: String, extent: CGFloat, stamp: Int) -> NSImage {
         let key = artworkKey(path, extent, stamp)
         if let cached = cache.object(forKey: key) { return cached }
-        guard let source = NSImage(contentsOfFile: path) else {
+        guard let source = NSImage(contentsOfFile: appearanceVariant(of: path)) else {
             return symbolIcon(named: "questionmark.square.dashed")
         }
         let (icon, cost) = fitted(source, to: extent)
@@ -325,6 +325,25 @@ enum IconCache {
 
     private static func artworkKey(_ path: String, _ extent: CGFloat, _ stamp: Int) -> NSString {
         key("artwork:\(extent):\(stamp):\(path)")
+    }
+
+    /// `icon@dark.png` beside `icon.png` is the dark-mode asset every Raycast extension already
+    /// ships. Resolved at decode rather than when the row is published, so flipping appearance
+    /// repaints off the invalidation `setDarkSurface` already performs — the style generation is
+    /// part of every key, so the two surfaces never serve each other's bitmap.
+    private static func appearanceVariant(of path: String) -> String {
+        guard darkSurface.withLock({ $0 }) else { return path }
+        let dark = darkVariantPath(of: path)
+        return FileManager.default.fileExists(atPath: dark) ? dark : path
+    }
+
+    /// The name only — existence is the caller's question. Stamping needs it for a file that is
+    /// allowed not to exist, so this stays a pure transform.
+    static func darkVariantPath(of path: String) -> String {
+        let url = URL(fileURLWithPath: path)
+        let ext = url.pathExtension
+        let base = url.deletingPathExtension().path
+        return ext.isEmpty ? base + "@dark" : "\(base)@dark.\(ext)"
     }
 
     // MARK: - Drawing an `EntryIcon`

@@ -23,9 +23,14 @@ enum ExtensionIconCache {
     // MARK: - Shipped with the extension
 
     /// A reinstall rewrites artwork in place under the same path, so the file's own stamp is what
-    /// separates the new bitmap from the one it replaced.
+    /// separates the new bitmap from the one it replaced. The `@dark` sibling is folded in: it is
+    /// what a dark row actually paints, and it can be the only file that changed.
     static func stamp(atPath path: String) -> Int {
-        FileIconStamp.value(for: URL(fileURLWithPath: path))
+        var hasher = Hasher()
+        hasher.combine(FileIconStamp.value(for: URL(fileURLWithPath: path)))
+        hasher.combine(
+            FileIconStamp.value(for: URL(fileURLWithPath: IconCache.darkVariantPath(of: path))))
+        return hasher.finalize()
     }
 
     /// Cache-only, so a warm row paints on the same frame.
