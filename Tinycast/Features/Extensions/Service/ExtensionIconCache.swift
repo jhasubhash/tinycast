@@ -22,9 +22,15 @@ enum ExtensionIconCache {
 
     // MARK: - Shipped with the extension
 
+    /// A reinstall rewrites artwork in place under the same path, so the file's own stamp is what
+    /// separates the new bitmap from the one it replaced.
+    static func stamp(atPath path: String) -> Int {
+        FileIconStamp.value(for: URL(fileURLWithPath: path))
+    }
+
     /// Cache-only, so a warm row paints on the same frame.
-    static func cached(atPath path: String) -> NSImage? {
-        IconCache.cachedArtwork(atPath: path, extent: extent)
+    static func cached(atPath path: String, stamp: Int) -> NSImage? {
+        IconCache.cachedArtwork(atPath: path, extent: extent, stamp: stamp)
     }
 
     /// Read from the file: `NSWorkspace` would answer a PNG with the generic document icon.
@@ -32,14 +38,15 @@ enum ExtensionIconCache {
         guard FileManager.default.fileExists(atPath: path) else {
             return IconCache.symbolIcon(named: "puzzlepiece.extension")
         }
-        return IconCache.artwork(atPath: path, extent: extent)
+        return IconCache.artwork(atPath: path, extent: extent, stamp: stamp(atPath: path))
     }
 
     static func loadAsync(atPath path: String) async -> NSImage? {
         guard FileManager.default.fileExists(atPath: path) else {
             return IconCache.symbolIcon(named: "puzzlepiece.extension")
         }
-        return await IconCache.loadArtworkAsync(atPath: path, extent: extent)
+        return await IconCache.loadArtworkAsync(
+            atPath: path, extent: extent, stamp: stamp(atPath: path))
     }
 
     /// Never rasterized: fitting flattens a GIF to its first frame.

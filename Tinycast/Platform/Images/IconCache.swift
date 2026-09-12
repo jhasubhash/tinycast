@@ -47,7 +47,9 @@ enum EntryIcon: Hashable, Sendable {
     case file(stamp: Int)
     case symbol(String)
     case tintedSymbol(name: String, tint: SymbolTint)
-    case artwork(path: String, extent: CGFloat)
+    /// Stamped like `file`: an extension can be reinstalled in place, and a path-only key would
+    /// serve the replaced artwork until the process died.
+    case artwork(path: String, extent: CGFloat, stamp: Int)
 }
 
 struct IconSize: Hashable, Sendable {
@@ -297,9 +299,10 @@ enum IconCache {
         return rasterized(source, into: NSRect(x: inset, y: inset, width: side, height: side))
     }
 
-    /// Keyed by path and extent, so two features wanting different sizes never serve each other's.
-    static func artwork(atPath path: String, extent: CGFloat) -> NSImage {
-        let key = artworkKey(path, extent)
+    /// Keyed by path, extent and stamp: two features wanting different sizes never serve each
+    /// other's, and replaced artwork never serves the bitmap it replaced.
+    static func artwork(atPath path: String, extent: CGFloat, stamp: Int) -> NSImage {
+        let key = artworkKey(path, extent, stamp)
         if let cached = cache.object(forKey: key) { return cached }
         guard let source = NSImage(contentsOfFile: path) else {
             return symbolIcon(named: "questionmark.square.dashed")
@@ -309,19 +312,19 @@ enum IconCache {
         return icon
     }
 
-    static func cachedArtwork(atPath path: String, extent: CGFloat) -> NSImage? {
-        cache.object(forKey: artworkKey(path, extent))
+    static func cachedArtwork(atPath path: String, extent: CGFloat, stamp: Int) -> NSImage? {
+        cache.object(forKey: artworkKey(path, extent, stamp))
     }
 
-    static func loadArtworkAsync(atPath path: String, extent: CGFloat) async -> NSImage? {
-        if let cached = cachedArtwork(atPath: path, extent: extent) { return cached }
+    static func loadArtworkAsync(atPath path: String, extent: CGFloat, stamp: Int) async -> NSImage? {
+        if let cached = cachedArtwork(atPath: path, extent: extent, stamp: stamp) { return cached }
         return await Task.detached(priority: .userInitiated) {
-            Decoded(image: artwork(atPath: path, extent: extent))
+            Decoded(image: artwork(atPath: path, extent: extent, stamp: stamp))
         }.value.image
     }
 
-    private static func artworkKey(_ path: String, _ extent: CGFloat) -> NSString {
-        key("artwork:\(extent):\(path)")
+    private static func artworkKey(_ path: String, _ extent: CGFloat, _ stamp: Int) -> NSString {
+        key("artwork:\(extent):\(stamp):\(path)")
     }
 
     // MARK: - Drawing an `EntryIcon`
@@ -332,7 +335,8 @@ enum IconCache {
         case .file(let stamp): return icon(forFile: fileURL.path, stamp: stamp)
         case .symbol(let name): return symbolIcon(named: name)
         case .tintedSymbol(let name, let tint): return symbolIcon(named: name, tint: tint)
-        case .artwork(let path, let extent): return artwork(atPath: path, extent: extent)
+        case .artwork(let path, let extent, let stamp):
+            return artwork(atPath: path, extent: extent, stamp: stamp)
         }
     }
 
@@ -341,7 +345,8 @@ enum IconCache {
         case .file(let stamp): return cached(forFile: fileURL.path, stamp: stamp, size: size)
         case .symbol(let name): return cachedSymbol(named: name)
         case .tintedSymbol(let name, let tint): return cachedSymbol(named: name, tint: tint)
-        case .artwork(let path, let extent): return cachedArtwork(atPath: path, extent: extent)
+        case .artwork(let path, let extent, let stamp):
+            return cachedArtwork(atPath: path, extent: extent, stamp: stamp)
         }
     }
 
@@ -350,8 +355,8 @@ enum IconCache {
         case .file(let stamp): return await loadAsync(forFile: fileURL.path, stamp: stamp, size: size)
         case .symbol(let name): return await loadSymbolAsync(named: name)
         case .tintedSymbol(let name, let tint): return await loadSymbolAsync(named: name, tint: tint)
-        case .artwork(let path, let extent):
-            return await loadArtworkAsync(atPath: path, extent: extent)
+        case .artwork(let path, let extent, let stamp):
+            return await loadArtworkAsync(atPath: path, extent: extent, stamp: stamp)
         }
     }
 

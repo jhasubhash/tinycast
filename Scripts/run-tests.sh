@@ -286,6 +286,7 @@ run entry-icon-test        Tinycast/Platform/Appearance.swift \
                            Tinycast/Platform/Images/FileIconStamp.swift
 run ext-icon-test          Tinycast/Platform/Appearance.swift \
                            Tinycast/Platform/Images/IconCache.swift \
+                           Tinycast/Platform/Images/FileIconStamp.swift \
                            Tinycast/Platform/Compression/Zlib.swift \
                            Tinycast/DesignSystem/Theme.swift \
                            Tinycast/DesignSystem/InterfaceMetrics.swift \
