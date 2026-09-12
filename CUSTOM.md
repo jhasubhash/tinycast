@@ -143,8 +143,12 @@ codesign -dvv "build/DerivedData/Build/Products/Debug/Tinycast Dev.app" 2>&1 | g
 
 Custom Tinycast extensions are **not** built here. They live one per folder under
 `~/Developer/tinycast_addons/extensions/`, each self-contained — manifest, sources, build script and
-installer in the same directory, with nothing above it. `fork-sync` is the working template, and its
-[README](../tinycast_addons/extensions/fork-sync/README.md) is the build and install loop.
+installer in the same directory, with nothing above it.
+
+| Extension | Does |
+| --- | --- |
+| [`fork-sync`](../tinycast_addons/extensions/fork-sync/README.md) | This fork's drift from upstream, its patches, and a run-the-sync action. Its README is the shared build loop and the `ext-test` recipe. |
+| [`copy-path`](../tinycast_addons/extensions/copy-path/README.md) | Copies the frontmost app's target: Finder's selection as paths, a browser's page URL. |
 
 Keeping them out is deliberate: an extension is a Raycast-format package that Tinycast loads from
 `~/Library/Application Support/<bundle id>/extensions/`, not something the app compiles. Putting one
