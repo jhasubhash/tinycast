@@ -141,9 +141,10 @@ codesign -dvv "build/DerivedData/Build/Products/Debug/Tinycast Dev.app" 2>&1 | g
 
 ## Extensions live outside this repo
 
-Custom Tinycast extensions are **not** built here. They live in
-`~/Developer/tinycast_addons/`, which has its own
-[README](../tinycast_addons/README.md) covering the build and install loop.
+Custom Tinycast extensions are **not** built here. They live one per folder under
+`~/Developer/tinycast_addons/extensions/`, each self-contained — manifest, sources, build script and
+installer in the same directory, with nothing above it. `fork-sync` is the working template, and its
+[README](../tinycast_addons/extensions/fork-sync/README.md) is the build and install loop.
 
 Keeping them out is deliberate: an extension is a Raycast-format package that Tinycast loads from
 `~/Library/Application Support/<bundle id>/extensions/`, not something the app compiles. Putting one
