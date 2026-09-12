@@ -107,6 +107,14 @@ struct QuicklinkTests {
         expect(
             !QuicklinkDestination.usesURLEncoding("/tmp/{argument}", homeDirectory: home),
             "an absolute path is not encoded either")
+        // The "open whatever I typed" fallback: `{argument}` alone is the destination, so a typed
+        // `~/.claude` must reach Finder as a path, not as `~%2F.claude`.
+        expect(
+            !QuicklinkDestination.usesURLEncoding("{argument}", homeDirectory: home),
+            "a lone placeholder is the destination, so it is not encoded")
+        expect(
+            QuicklinkDestination.usesURLEncoding("{a}{b}", homeDirectory: home),
+            "two placeholders are a template again, so values are encoded")
     }
 
     static func placeholderDetection() {

@@ -54,7 +54,18 @@ enum QuicklinkDestination: Hashable, Sendable {
     /// Whether substituted values need percent-encoding, decided before placeholders resolve.
     static func usesURLEncoding(_ link: String, homeDirectory: String = NSHomeDirectory()) -> Bool {
         let trimmed = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A template that is *only* a placeholder has no surrounding URL to protect: the typed
+        // value is the whole destination. Encoding it would mangle a path into `~%2F.claude` and
+        // a URL into `https%3A//…`, so neither kind of destination could open.
+        if isWholePlaceholder(trimmed) { return false }
         return absolutePath(trimmed, homeDirectory: homeDirectory) == nil
+    }
+
+    /// `{argument}` yes; `{a}{b}` and `/tmp/{a}` no - those have text of their own to keep safe.
+    private static func isWholePlaceholder(_ value: String) -> Bool {
+        guard value.hasPrefix("{"), value.hasSuffix("}"), value.count > 2 else { return false }
+        let body = value.dropFirst().dropLast()
+        return !body.contains("{") && !body.contains("}")
     }
 
     /// True while a placeholder remains; validation accepts it and the open path reports.
