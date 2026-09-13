@@ -62,7 +62,8 @@ with a `manifest.json` and the dylib it names. The bundle id is per channel, so 
 @MainActor public protocol TinycastPlugin: AnyObject {
     init()
     static var metadata: PluginMetadata { get }
-    func results(for context: PluginContext) -> [PluginResult]
+    func rootSurface(context: PluginContext) -> AnyView?                                   // default: nil
+    func results(for context: PluginContext) -> [PluginResult]                            // default: []
     func children(of resultID: String, context: PluginContext) async -> [PluginResult]   // default: []
     func perform(resultID: String, context: PluginContext) async -> PluginActionResult    // default: .close
     func surface(for resultID: String, context: PluginContext) -> AnyView                 // default: EmptyView
@@ -86,6 +87,10 @@ lists are filtered by the host. A surface owns the entire panel and its own keyb
 **Escape always pops the surface** (the host claims it with a local monitor, so it works even while
 the plugin's own text field is focused). Draw your own back control only if you want one — you never
 get a duplicate palette chevron over a surface.
+
+**A surface-only plugin** returns a view from `rootSurface(context:)` and opens straight into it —
+no root row list, no `results(for:)`. The whole plugin is that one SwiftUI screen (see the
+stock-quotes plugin). Return nil to keep the row model instead; a plugin does one or the other.
 
 ### A surface's scaffold
 

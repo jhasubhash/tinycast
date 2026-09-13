@@ -176,7 +176,12 @@ final class PluginManager {
             loaded = plugin
             runningID = install.id
             metadata = type(of: plugin).metadata
-            levels = [.root]
+            // A surface plugin opens straight into its screen; no root row list to step through.
+            if let root = plugin.rootSurface(context: context(query: "")) {
+                levels = [.surface(id: "__root__", view: root)]
+            } else {
+                levels = [.root]
+            }
             plugin.bind { [weak self] in self?.reloadRows() }
             state = .active
         } catch {

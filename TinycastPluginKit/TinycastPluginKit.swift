@@ -132,7 +132,13 @@ public protocol TinycastPlugin: AnyObject {
     /// rows never change on their own can ignore this.
     func bind(reload: @escaping () -> Void)
 
+    /// Return a view here to open the plugin straight into a surface, skipping the root row list —
+    /// the whole plugin is then that one SwiftUI screen. Nil (the default) keeps the row model, and
+    /// `results(for:)` supplies the root list. A plugin does one or the other, not both.
+    func rootSurface(context: PluginContext) -> AnyView?
+
     /// The rows shown at the plugin's root, re-asked on every keystroke — filter on `context.query`.
+    /// Ignored when `rootSurface` returns a view.
     func results(for context: PluginContext) -> [PluginResult]
 
     /// Rows for a `.children` action. Runs async so it can hit the network or disk.
@@ -146,6 +152,8 @@ public protocol TinycastPlugin: AnyObject {
 }
 
 public extension TinycastPlugin {
+    func rootSurface(context: PluginContext) -> AnyView? { nil }
+    func results(for context: PluginContext) -> [PluginResult] { [] }
     func children(of resultID: String, context: PluginContext) async -> [PluginResult] { [] }
     func perform(resultID: String, context: PluginContext) async -> PluginActionResult { .close }
     func surface(for resultID: String, context: PluginContext) -> AnyView { AnyView(EmptyView()) }
@@ -300,7 +308,9 @@ public struct PluginScaffold<Root: View>: View {
     }
 
     public var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        // Refreshed every render so the monitor calls into the current state, not a stale snapshot.
+        monitor.handler = handleKey
+        return ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
                 stackedViews
                 footer
@@ -314,7 +324,7 @@ public struct PluginScaffold<Root: View>: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onAppear { monitor.start(handler: handleKey) }
+        .onAppear { monitor.start() }
         .onDisappear { monitor.stop() }
     }
 
@@ -437,16 +447,20 @@ private struct KeyChord: Sendable {
 private final class KeyMonitor {
     private var token: Any?
 
-    func start(handler: @escaping @MainActor (KeyChord) -> Bool) {
+    /// Reset every render so it always sees the surface's current state — a handler captured once
+    /// would write through a stale value's @State and never repaint the live view.
+    var handler: (@MainActor (KeyChord) -> Bool)?
+
+    func start() {
         guard token == nil else { return }
-        token = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+        token = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
             let chord = KeyChord(
                 keyCode: event.keyCode,
                 command: mods == .command,
                 bare: mods.isEmpty,
                 chars: event.charactersIgnoringModifiers?.lowercased())
-            return MainActor.assumeIsolated { handler(chord) } ? nil : event
+            return MainActor.assumeIsolated { self?.handler?(chord) ?? false } ? nil : event
         }
     }
 
