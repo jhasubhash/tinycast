@@ -146,6 +146,17 @@ this), enable plugins in **Settings → Plugins**, and search for the plugin by 
 { "name": "My Plugin", "identifier": "com.example.my", "icon": "star", "dylib": "libMyPlugin.dylib" }
 ```
 
+## Installing while Tinycast runs
+
+`PluginManager` watches the plugins folder with a `DispatchSourceFileSystemObject` (the same idiom
+as `SnippetsStore`), so a plugin dropped in — e.g. by `build.sh install` — appears in the launcher
+within a moment, no relaunch needed. The rescan is debounced, so a burst of file copies from one
+install collapses into a single refresh.
+
+The one case a restart is still required: **updating a plugin that is already loaded.** Once a
+plugin has been launched this session its dylib is mapped, and `dlopen` reference-counts — rebuilding
+the same path won't replace the running image. Quit and reopen Tinycast to pick up a rebuilt dylib.
+
 ## Security
 
 A plugin is native code loaded into Tinycast's process: it inherits every permission Tinycast holds

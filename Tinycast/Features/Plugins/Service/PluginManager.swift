@@ -51,6 +51,9 @@ final class PluginManager {
     @ObservationIgnored private var loaded: (any TinycastPlugin)?
     @ObservationIgnored private var runningID: String?
     @ObservationIgnored private var environment = PluginEnvironment()
+    @ObservationIgnored private var directoryWatcher: DispatchSourceFileSystemObject?
+    @ObservationIgnored private var watcherGeneration = 0
+    @ObservationIgnored private var rescanTask: Task<Void, Never>?
 
     func start(appIndex: AppIndex) {
         self.appIndex = appIndex
@@ -62,12 +65,59 @@ final class PluginManager {
         guard enabled != isEnabled else { return }
         isEnabled = enabled
         guard enabled else {
+            stopWatching()
             stop()
             installed = []
             appIndex?.setPluginCommands([])
             return
         }
         refresh()
+        armDirectoryWatcher()
+    }
+
+    // MARK: - Live install detection
+
+    /// Watches the plugins folder so a plugin dropped in while Tinycast runs appears without a
+    /// relaunch. Mirrors `SnippetsStore`'s directory watcher. Updating a *loaded* dylib still needs
+    /// a restart — `dlopen` reference-counts and the old image stays mapped.
+    private func armDirectoryWatcher() {
+        directoryWatcher?.cancel()
+        let descriptor = Darwin.open(PluginCatalog.pluginsDirectory().path, O_EVTONLY)
+        guard descriptor >= 0 else { return }
+        watcherGeneration &+= 1
+        let generation = watcherGeneration
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: descriptor,
+            eventMask: [.write, .extend, .attrib, .delete, .rename, .revoke],
+            queue: .main)
+        source.setEventHandler { [weak self] in
+            MainActor.assumeIsolated { self?.handleDirectoryChange(generation: generation) }
+        }
+        source.setCancelHandler { Darwin.close(descriptor) }
+        directoryWatcher = source
+        source.resume()
+    }
+
+    private func handleDirectoryChange(generation: Int) {
+        guard isEnabled, generation == watcherGeneration else { return }
+        let events = directoryWatcher?.data ?? []
+        // The folder itself was replaced; re-arm against the fresh inode (scan recreates it).
+        if !events.isDisjoint(with: [.delete, .rename, .revoke]) { armDirectoryWatcher() }
+        // Debounced: a burst of file copies from one install collapses into a single rescan.
+        rescanTask?.cancel()
+        rescanTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(200))
+            guard let self, !Task.isCancelled, self.isEnabled else { return }
+            self.refresh()
+        }
+    }
+
+    private func stopWatching() {
+        watcherGeneration &+= 1
+        rescanTask?.cancel()
+        rescanTask = nil
+        directoryWatcher?.cancel()
+        directoryWatcher = nil
     }
 
     func setShowsInLauncher(_ shows: Bool) {
