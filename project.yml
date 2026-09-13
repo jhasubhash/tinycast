@@ -49,6 +49,10 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      - target: TinycastPluginKit
+        link: true
+        embed: true
+        codeSign: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tinycast.app
@@ -81,3 +85,27 @@ targets:
         EXECUTABLE_NAME: ClipboardTextHelper
         PRODUCT_MODULE_NAME: ClipboardTextHelper
         SKIP_INSTALL: YES
+
+  # The public plugin contract. Embedded in the app so a loaded plugin dylib resolves the exact
+  # same module identity it was compiled against; a plugin links this framework, never a copy.
+  TinycastPluginKit:
+    type: framework
+    platform: macOS
+    sources:
+      - path: TinycastPluginKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tinycast.pluginkit
+        PRODUCT_NAME: TinycastPluginKit
+        PRODUCT_MODULE_NAME: TinycastPluginKit
+        DEFINES_MODULE: YES
+        # A stable .swiftinterface so a plugin built by a different Xcode still imports it.
+        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SKIP_INSTALL: NO
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Tinycast Self-Signed"

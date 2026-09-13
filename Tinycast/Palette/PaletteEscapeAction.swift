@@ -6,6 +6,7 @@ enum PaletteEscapeAction: Equatable {
     case leaveArgumentField
     case clearQuery
     case exitExtensionScreen
+    case exitPluginScreen
     case goBack
     case hidePalette
 
@@ -20,6 +21,8 @@ enum PaletteEscapeAction: Equatable {
         guard behavior == .navigateBackOrClose else { return .hidePalette }
         // An extension pops its own navigation stack before the command is left.
         if mode == .extensionCommand { return .exitExtensionScreen }
+        // A plugin pops its own navigation stack before the plugin itself is left.
+        if mode == .plugin { return .exitPluginScreen }
         return canGoBack ? .goBack : .hidePalette
     }
 }

@@ -14,6 +14,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case quicklink
         case extensionCommand
         case meeting
+        case plugin
 
         var descriptor: KindDescriptor {
             switch self {
@@ -77,6 +78,11 @@ struct AppEntry: Identifiable, Hashable, Sendable {
                 return KindDescriptor(
                     label: "Meeting", sectionTitle: "Meetings",
                     openVerb: "Join Meeting", canHideFromSearch: false,
+                    canRevealInFinder: false, isSymbolIcon: true)
+            case .plugin:
+                return KindDescriptor(
+                    label: "Plugin", sectionTitle: "Plugins",
+                    openVerb: "Open Plugin", canHideFromSearch: false,
                     canRevealInFinder: false, isSymbolIcon: true)
             }
         }
@@ -175,6 +181,8 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return Quicklink.id(fromEntryID: id).map { .quicklink(id: $0) }
         case .extensionCommand:
             return .extensionCommand(entryID: id)
+        case .plugin:
+            return .pluginCommand(entryID: id)
         case .snippet, .meeting:
             return nil
         }
@@ -207,7 +215,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return WindowCommandCatalog.command(forEntryID: id)?.sfSymbol ?? "questionmark"
         case .windowLayout: return WindowLayout.sfSymbol
         case .meeting: return "video.fill"
-        case .application, .systemSettings, .extensionCommand: return "questionmark"
+        case .application, .systemSettings, .extensionCommand, .plugin: return "questionmark"
         }
     }
 
@@ -316,6 +324,7 @@ final class AppIndex {
     private var quicklinkEntries: [AppEntry] = []
     private var customQuickActionEntries: [AppEntry] = []
     private var extensionEntries: [AppEntry] = []
+    private var pluginEntries: [AppEntry] = []
     private var meetingEntries: [AppEntry] = []
     /// The catalog's commands a disabled feature hides; the Commands slice is recomputed from it.
     private var hiddenCommands: Set<CommandID> = []
@@ -407,6 +416,13 @@ final class AppIndex {
     func setExtensionCommands(_ entries: [AppEntry]) {
         guard entries != extensionEntries else { return }
         extensionEntries = entries
+        publishEntries()
+    }
+
+    /// Called by `PluginManager` when the installed native-plugin set changes.
+    func setPluginCommands(_ entries: [AppEntry]) {
+        guard entries != pluginEntries else { return }
+        pluginEntries = entries
         publishEntries()
     }
 
@@ -550,7 +566,8 @@ final class AppIndex {
         let updated =
             Self.named(meetingEntries) + discoveredEntries
             + Self.named(
-                extensionEntries + quicklinkEntries + snippetEntries + Self.systemActionEntries
+                extensionEntries + pluginEntries + quicklinkEntries + snippetEntries
+                    + Self.systemActionEntries
                     + windowLayoutEntries + windowCommandEntries + customCommandEntries
                     + quickActionEntries + commandEntries)
         guard updated != apps else { return }

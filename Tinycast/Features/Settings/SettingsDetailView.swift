@@ -26,6 +26,7 @@ struct SettingsDetailView: View {
             case .emoji: EmojiSettingsView()
             case .calendar: CalendarSettingsView()
             case .extensions: ExtensionsSettingsView()
+            case .plugins: PluginsSettingsView()
             case .permissions: PermissionsSettingsView()
             case .backup: BackupSettingsView()
             case .about: AboutView()

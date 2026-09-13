@@ -217,6 +217,8 @@ Tinycast/
     Launcher/ Clipboard/ Calculator/ Calendar/ Emoji/ FileSearch/ MenuSearch/ Notes/
     Quicklinks/ Snippets/ Uninstall/ SystemActions/ CustomCommands/ HotKeys/ Backup/
     WindowManagement/ Onboarding/ Updates/ Support/ AI/ Settings/
+    Plugins/        native Swift plugins: Service/ UI/ Settings/ (the public contract is the
+                    top-level TinycastPluginKit/ framework, embedded in the app)
     Extensions/
         Model/      pure — the harness inputs
         Service/    effects — stores, monitors, runners, AppKit glue

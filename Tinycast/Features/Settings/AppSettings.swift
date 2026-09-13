@@ -332,6 +332,17 @@ final class AppSettings {
         }
     }
 
+    /// Consent to run native plugins: like extensions it confirms, defaults off, rides no backup.
+    var pluginsEnabled: Bool {
+        didSet { defaults.set(pluginsEnabled, forKey: Key.pluginsEnabled.rawValue) }
+    }
+
+    var pluginsShowInLauncher: Bool {
+        didSet {
+            defaults.set(pluginsShowInLauncher, forKey: Key.pluginsShowInLauncher.rawValue)
+        }
+    }
+
     /// Only a source registry needs one — the store serves extensions already built.
     var extensionPackageManager: ExtensionPackageManager {
         didSet {
@@ -576,6 +587,10 @@ final class AppSettings {
         extensionsShowInLauncher =
             defaults.object(forKey: Key.extensionsShowInLauncher.rawValue) == nil
             || defaults.bool(forKey: Key.extensionsShowInLauncher.rawValue)
+        pluginsEnabled = defaults.bool(forKey: Key.pluginsEnabled.rawValue)
+        pluginsShowInLauncher =
+            defaults.object(forKey: Key.pluginsShowInLauncher.rawValue) == nil
+            || defaults.bool(forKey: Key.pluginsShowInLauncher.rawValue)
         extensionPackageManager =
             defaults.string(forKey: Key.extensionPackageManager.rawValue)
             .flatMap(ExtensionPackageManager.init(rawValue:)) ?? .automatic

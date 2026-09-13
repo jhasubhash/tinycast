@@ -18,6 +18,7 @@ final class LauncherCoordinator {
     private let windowSwitchCoordinator: WindowSwitchCoordinator
     private let notesCoordinator: NotesCoordinator
     private let extensionCoordinator: ExtensionCoordinator
+    private let pluginCoordinator: PluginCoordinator
     private let calendarCoordinator: CalendarCoordinator
     /// The backup commands only, which need the live stores to gather from and apply to.
     private unowned let core: AppCore
@@ -38,6 +39,7 @@ final class LauncherCoordinator {
         windowSwitchCoordinator: WindowSwitchCoordinator,
         notesCoordinator: NotesCoordinator,
         extensionCoordinator: ExtensionCoordinator,
+        pluginCoordinator: PluginCoordinator,
         calendarCoordinator: CalendarCoordinator,
         core: AppCore
     ) {
@@ -56,6 +58,7 @@ final class LauncherCoordinator {
         self.windowSwitchCoordinator = windowSwitchCoordinator
         self.notesCoordinator = notesCoordinator
         self.extensionCoordinator = extensionCoordinator
+        self.pluginCoordinator = pluginCoordinator
         self.calendarCoordinator = calendarCoordinator
         self.core = core
     }
@@ -118,6 +121,10 @@ final class LauncherCoordinator {
             extensionCoordinator.runExtensionCommand(app, arguments: arguments)
             return
         }
+        if app.kind == .plugin {
+            pluginCoordinator.launch(app)
+            return
+        }
         if app.kind == .meeting {
             guard let id = MeetingEvent.id(fromEntryID: app.id) else { return }
             calendarCoordinator.activateMeeting(id: id)
@@ -141,7 +148,7 @@ final class LauncherCoordinator {
             let snippetID = String(app.id.dropFirst("snippet:".count))
             snippetCoordinator.expandSnippet(id: snippetID, target: previous)
         case .command, .quickAction, .customCommand, .systemAction, .windowCommand, .windowLayout,
-            .quicklink, .extensionCommand, .meeting:
+            .quicklink, .extensionCommand, .plugin, .meeting:
             break  // handled above
         }
     }

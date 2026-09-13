@@ -103,6 +103,8 @@ struct RootPaletteView: View {
         case .extensionCommand:
             return ExtensionCommandScreen(
                 screen: extensionScreen, extensions: extensions, vm: vm, openActions: openActions)
+        case .plugin:
+            return PluginScreen(manager: core.plugins, vm: vm, openActions: openActions)
         }
     }
 
@@ -455,6 +457,8 @@ struct RootPaletteView: View {
                     vm.query = ""
                 case .exitExtensionScreen:
                     core.extensionCoordinator.exitExtensionScreen()
+                case .exitPluginScreen:
+                    core.pluginCoordinator.exitPluginScreen()
                 case .goBack:
                     goBack()
                 case .hidePalette:
@@ -1109,6 +1113,7 @@ struct RootPaletteView: View {
     /// An extension keeps its own stack, so it can have a step back the palette cannot see.
     private var hasBackStep: Bool {
         vm.canGoBack || (vm.mode == .extensionCommand && extensions.navigationDepth > 1)
+            || (vm.mode == .plugin && core.plugins.canGoBack)
     }
 
     /// Never promises a step the click does not take: a root screen closes rather than backs.
@@ -1120,6 +1125,10 @@ struct RootPaletteView: View {
     private func goBack() {
         if vm.mode == .extensionCommand {
             core.extensionCoordinator.exitExtensionScreen()
+            return
+        }
+        if vm.mode == .plugin {
+            core.pluginCoordinator.exitPluginScreen()
             return
         }
         if !vm.pop() { core.paletteCoordinator.hidePalette() }
