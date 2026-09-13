@@ -424,6 +424,8 @@ public struct PluginScaffold<Root: View>: View {
             switch chord.keyCode {
             case 125: if listKey(.down) { return true }
             case 126: if listKey(.up) { return true }
+            case 123: if listKey(.left) { return true }
+            case 124: if listKey(.right) { return true }
             case 36, 76: if listKey(.submit) { return true }
             case 53: if navigator.pop() { return true }; pluginExit(); return true
             default: break
@@ -438,6 +440,8 @@ public struct PluginScaffold<Root: View>: View {
 public enum PluginListKey: Sendable {
     case up
     case down
+    case left
+    case right
     case submit
 }
 
