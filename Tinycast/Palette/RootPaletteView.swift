@@ -249,9 +249,15 @@ struct RootPaletteView: View {
                         screen.body(selection: sel, scroll: scroll)
                     }
                 }
-                // A plugin surface owns the whole panel; the palette shows no chrome over it.
+                // A plugin surface owns the whole panel, so collapse the header to nothing — but keep
+                // it mounted. Tearing the search field down loses its editor, and the plugin's list
+                // would then receive no keys once the surface pops. See the note on `headerField`.
                 .safeAreaInset(edge: .top, spacing: 0) {
-                    if !pluginSurfaceActive { header }
+                    header
+                        .frame(height: pluginSurfaceActive ? 0 : nil, alignment: .top)
+                        .opacity(pluginSurfaceActive ? 0 : 1)
+                        .clipped()
+                        .allowsHitTesting(!pluginSurfaceActive)
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if !isCollapsed, !pluginSurfaceActive {
@@ -383,7 +389,17 @@ struct RootPaletteView: View {
             }
             .onAppear { searchFocused = !screen.hidesSearchField }
             .onChange(of: pluginSurfaceActive) { _, active in
-                if active { installPluginEscapeMonitor() } else { removePluginEscapeMonitor() }
+                if active {
+                    installPluginEscapeMonitor()
+                } else {
+                    removePluginEscapeMonitor()
+                    // The surface held first responder; refocus the palette's field so its arrow and
+                    // Escape handlers get keys again on the plugin's list. Deferred a tick so the
+                    // header field it targets has remounted first.
+                    if vm.mode == .plugin {
+                        Task { @MainActor in searchFocused = true }
+                    }
+                }
             }
             .modifier(SearchFieldHiding(hidden: hidesSearchField, apply: applySearchFieldHiding))
             // Several paths flip `paletteIsCollapsed`, so resize the window to match.
