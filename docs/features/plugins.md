@@ -83,10 +83,9 @@ with a `manifest.json` and the dylib it names. The bundle id is per channel, so 
     - `.none` → inert.
 
 `results(for:)` is re-asked on every keystroke — filter on `context.query` yourself. Pushed child
-lists are filtered by the host. A surface owns the entire panel and its own keyboard focus; a bare
-**Escape always pops the surface** (the host claims it with a local monitor, so it works even while
-the plugin's own text field is focused). Draw your own back control only if you want one — you never
-get a duplicate palette chevron over a surface.
+lists are filtered by the host. A surface owns the entire panel and its own keyboard: wrap it in a
+`PluginScaffold` (below), which claims Escape, ⌘K and the list keys through a local monitor ahead of
+the host, so navigation never depends on which control holds first responder.
 
 **A surface-only plugin** returns a view from `rootSurface(context:)` and opens straight into it —
 no root row list, no `results(for:)`. The whole plugin is that one SwiftUI screen (see the
@@ -95,19 +94,23 @@ stock-quotes plugin). Return nil to keep the row model instead; a plugin does on
 ### A surface's scaffold
 
 A `.surface` owns the whole panel, so the framework hands it the chrome the host no longer draws.
-Wrap the surface's body in `PluginScaffold(navigator:primaryActionLabel:commands:listKey:) { root }`:
+Wrap the surface's body in
+`PluginScaffold(navigator:primaryActionLabel:commands:commandTitle:listKey:) { root }`:
 
 - `PluginNavigator` — the surface's own view stack. `push(title:_:)` drills in; **Escape** pops it,
-  and once back at the root Escape leaves the plugin. No back chevron to wire — the scaffold draws
-  one and Escape drives it.
-- `commands:` — the `[PluginCommand]` for whatever view is on top, listed in a **⌘K** palette pinned
+  and at the root Escape leaves the plugin (the scaffold calls the host-injected
+  `EnvironmentValues.pluginExit`). No back chevron to wire, and no Escape monitor to install.
+- `commands:` / `commandTitle:` — the `[PluginCommand]` and heading for the **⌘K** palette pinned
   bottom-right. `PluginCommand(title:subtitle:icon:shortcut:action:)`; re-read each time it opens.
-- `listKey:` — ↑/↓/Return for a list on the current view. The scaffold reads these from its own
-  event monitor, so a list navigates even while a search field holds focus — or none does. Return
-  true when you consumed the key.
+- `listKey:` — `↑/↓/←/→/Return` (`PluginListKey`) for a list on the current view, read from the
+  scaffold's own monitor so it works whatever holds focus. Return true when you consumed the key;
+  ←/→ can drive a second axis, or fall through to the search caret when you return false.
 
-The scaffold claims Escape, ⌘K and the list keys through a local monitor, ahead of the host, so a
-surface's keyboard never depends on which control is first responder.
+The scaffold overlays a translucent footer and masks a bottom fade, so content fills to the edge and
+dissolves under it — give scroll views `.contentMargins(.bottom, …)` so the last row clears the footer.
+
+The full authoring guide — focus/layout gotchas and a worked example — lives beside the plugins:
+`tinycast_addons/extensions/SWIFT_PLUGINS.md`.
 
 ## Writing a plugin
 
