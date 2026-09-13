@@ -41,9 +41,18 @@ struct RootPaletteView: View {
     @State private var hostWindow: NSWindow?
     /// The pending scroll request; modes are exclusive, so one piece of state serves all.
     @State private var scroll = ScrollIntent(kind: .top)
+    /// A local key monitor, live only while a plugin surface owns the panel, so Escape still exits
+    /// even when the plugin's own text field holds first responder.
+    @State private var pluginEscapeMonitor: Any?
 
     /// Compact vs. full; the source of truth is on `AppCore`, so the two can't disagree.
     private var isCollapsed: Bool { core.paletteCoordinator.paletteIsCollapsed }
+
+    /// A plugin surface takes the whole panel: the palette shows no header, footer or drag strip
+    /// over it, and the plugin owns its own chrome.
+    private var pluginSurfaceActive: Bool {
+        vm.mode == .plugin && core.plugins.surface != nil
+    }
 
     /// The current mode's screen: its rows are the visible order the flat selection indexes.
     private var screen: any PaletteScreen {
@@ -240,9 +249,12 @@ struct RootPaletteView: View {
                         screen.body(selection: sel, scroll: scroll)
                     }
                 }
-                .safeAreaInset(edge: .top, spacing: 0) { header }
+                // A plugin surface owns the whole panel; the palette shows no chrome over it.
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if !pluginSurfaceActive { header }
+                }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if !isCollapsed {
+                    if !isCollapsed, !pluginSurfaceActive {
                         bottomBar(
                             pillLabel: screen.primaryActionTitle, showActionGroup: showActionGroup,
                             formPrimaryShortcut: isExtensionForm,
@@ -250,7 +262,7 @@ struct RootPaletteView: View {
                     }
                 }
                 // The panel has no title bar, so this thin top margin is the only place left to grab it.
-                .overlay(alignment: .top) { topDragStrip }
+                .overlay(alignment: .top) { if !pluginSurfaceActive { topDragStrip } }
                 .modifier(
                     ExtensionToastOverlay(extensions: extensions, showing: vm.mode == .extensionCommand)
                 )
@@ -367,13 +379,38 @@ struct RootPaletteView: View {
             .onDisappear {
                 menuPanel.hide()
                 (hostWindow as? PalettePanel)?.onHeaderFieldBoundaryArrow = nil
+                removePluginEscapeMonitor()
             }
             .onAppear { searchFocused = !screen.hidesSearchField }
+            .onChange(of: pluginSurfaceActive) { _, active in
+                if active { installPluginEscapeMonitor() } else { removePluginEscapeMonitor() }
+            }
             .modifier(SearchFieldHiding(hidden: hidesSearchField, apply: applySearchFieldHiding))
             // Several paths flip `paletteIsCollapsed`, so resize the window to match.
             .onChange(of: core.paletteCoordinator.paletteIsCollapsed) {
                 core.paletteCoordinator.syncPaletteSize()
             }
+    }
+
+    /// A plugin surface owns the keyboard through its own focused fields, so SwiftUI's `onKeyPress`
+    /// never sees Escape. A local monitor claims a bare Escape and pops the surface instead.
+    private func installPluginEscapeMonitor() {
+        guard pluginEscapeMonitor == nil else { return }
+        pluginEscapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.keyCode == 53,
+                event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
+                core.paletteCoordinator.isVisible, pluginSurfaceActive
+            else { return event }
+            core.pluginCoordinator.exitPluginScreen()
+            return nil
+        }
+    }
+
+    private func removePluginEscapeMonitor() {
+        if let monitor = pluginEscapeMonitor {
+            NSEvent.removeMonitor(monitor)
+            pluginEscapeMonitor = nil
+        }
     }
 
     /// Split from `body`: one chain of this length is past what the type-checker will infer.

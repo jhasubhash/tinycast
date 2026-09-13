@@ -76,12 +76,16 @@ with a `manifest.json` and the dylib it names. The bundle id is per channel, so 
   - `PluginAction` — what activating the row does:
     - `.run(id:)` → the host calls `perform`, honours `PluginActionResult(closesLauncher:message:)`.
     - `.children(id:)` → the host calls `children` and pushes the returned rows.
-    - `.surface(id:)` → the host calls `surface` and shows your SwiftUI view full-screen.
+    - `.surface(id:)` → the host shows your SwiftUI view as the **whole panel**: the palette hides
+      its own header, footer and drag strip, so the surface draws its own chrome if it wants any.
     - `.openURL(URL)` → the host opens it and closes the launcher.
     - `.none` → inert.
 
 `results(for:)` is re-asked on every keystroke — filter on `context.query` yourself. Pushed child
-lists are filtered by the host. A surface owns the keyboard; Escape pops back out.
+lists are filtered by the host. A surface owns the entire panel and its own keyboard focus; a bare
+**Escape always pops the surface** (the host claims it with a local monitor, so it works even while
+the plugin's own text field is focused). Draw your own back control only if you want one — you never
+get a duplicate palette chevron over a surface.
 
 ## Writing a plugin
 
