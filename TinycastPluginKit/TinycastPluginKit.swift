@@ -281,6 +281,7 @@ public struct PluginScaffold<Root: View>: View {
     private let root: Root
 
     @Environment(\.pluginExit) private var pluginExit
+    @Environment(\.colorScheme) private var colorScheme
     @State private var paletteOpen = false
     @State private var selection = 0
     @State private var monitor = KeyMonitor()
@@ -352,17 +353,19 @@ public struct PluginScaffold<Root: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// No bar of its own — matches the palette's footer: frosted glass capsules floating over the
-    /// surface, bare until hover, with the same outline keycaps.
+    /// No bar of its own — matches the palette's footer: real Liquid Glass capsules (so they follow
+    /// the app's transparency), frosted like the host's, bare until hover, with outline keycaps.
     private var footer: some View {
         HStack(spacing: 8) {
             if navigator.canPop {
-                GlassBarButton(action: { navigator.pop() }) {
-                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
-                    Text("Back")
-                    KeyCap(text: "esc", outline: true)
+                HStack(spacing: 2) {
+                    GlassBarButton(action: { navigator.pop() }) {
+                        Image(systemName: "chevron.left").font(.callout.weight(.semibold))
+                        Text("Back")
+                        KeyCap(text: "esc", outline: true)
+                    }
                 }
-                .glassEffect(.regular.interactive(), in: Capsule())
+                .modifier(FrostedCapsule(scheme: colorScheme))
             }
             Spacer(minLength: 0)
             if !primaryLabel.isEmpty || !currentCommands.isEmpty {
@@ -381,11 +384,11 @@ public struct PluginScaffold<Root: View>: View {
                         }
                     }
                 }
-                .glassEffect(.regular.interactive(), in: Capsule())
+                .modifier(FrostedCapsule(scheme: colorScheme))
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 44)
+        .padding(.horizontal, 8)
+        .frame(height: 52)
         .frame(maxWidth: .infinity)
     }
 
@@ -579,7 +582,7 @@ private struct KeyCap: View {
 }
 
 /// A footer control: bare until hover, then a faint capsule wash — the plugin's own `BarButton`,
-/// sat inside a frosted glass capsule by its caller.
+/// sat inside a frosted glass capsule by its caller. Metrics match the host's footer.
 private struct GlassBarButton<Label: View>: View {
     let action: () -> Void
     @ViewBuilder let label: () -> Label
@@ -588,15 +591,29 @@ private struct GlassBarButton<Label: View>: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) { label() }
-                .font(.system(size: 12, weight: .medium))
+                .font(.callout.weight(.medium))
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 8)
                 .frame(height: 28)
                 .contentShape(Capsule())
-                .background(Capsule().fill(hovered ? Color.primary.opacity(0.08) : Color.clear))
+                .background(Capsule().fill(hovered ? Color.primary.opacity(0.09) : Color.clear))
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
+    }
+}
+
+/// The palette's `frosted(in:)` restated: real Liquid Glass tinted like the host's controls, so a
+/// footer capsule reads the same and follows the app's background-transparency setting.
+private struct FrostedCapsule: ViewModifier {
+    let scheme: ColorScheme
+
+    func body(content: Content) -> some View {
+        let frost = Color.white.opacity(scheme == .dark ? 0.05 : 0.25)
+        return content
+            .padding(4)
+            .glassEffect(.regular.interactive().tint(frost), in: Capsule())
+            .tint(.clear)
     }
 }
 
