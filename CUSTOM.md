@@ -196,4 +196,4 @@ link are the fork's own scaffolding and are not listed. `git log main..custom` i
 
 | Change | Files | Why | Upstreamable |
 | --- | --- | --- | --- |
-| _none yet_ | | | |
+| Inline alias & shortcut editing on the ⌘K action-panel rows | `Features/Launcher/UI/{AppActionsMenu,LauncherCoordinator,InlineEntryEditor}.swift`, `Features/Launcher/Service/AppIndex.swift`, `Features/HotKeys/UI/ShortcutRecorder.swift`, `Palette/{PaletteState,PaletteScreen,RootPaletteView,PalettePanel,PaletteWindowController}.swift`, `DesignSystem/PopoverMenu.swift` | Raycast-parity: ⌘K → Change Alias / Change Shortcut edit in a box on the row itself (menu stays open; alias reads faded until edited and commits on ↵; shortcut shows "Listening…", assigns on capture, flags a taken chord inline). Extension commands gained a `hotKeyAction` so they're bindable too. `ShortcutRecorder` gained `recordingAccent`/`showsConflictInline`. | Yes |

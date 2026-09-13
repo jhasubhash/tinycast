@@ -46,13 +46,16 @@ typealias MenuPanelClipPath =
     let view: (MenuPanelCorner) -> AnyView
     /// Bounds-checked by the caller against `rowCount`, so a row index is always one this menu has.
     let activate: (Int) -> Void
+    /// True when activating the row edits it in place; the caller then leaves the menu open.
+    let keepsOpen: (Int) -> Bool
 
     init(
         rowCount: Int, view: @escaping (MenuPanelCorner) -> AnyView,
         activate: @escaping (Int) -> Void,
         isSelectable: @escaping (Int) -> Bool = { _ in true },
         clipPath: @escaping MenuPanelClipPath,
-        motion: MenuPanelMotion
+        motion: MenuPanelMotion,
+        keepsOpen: @escaping (Int) -> Bool = { _ in false }
     ) {
         self.rowCount = rowCount
         self.view = view
@@ -60,6 +63,7 @@ typealias MenuPanelClipPath =
         self.isSelectable = isSelectable
         self.clipPath = clipPath
         self.motion = motion
+        self.keepsOpen = keepsOpen
     }
 
     init(
@@ -83,7 +87,8 @@ typealias MenuPanelClipPath =
                     attachedRadius: metrics.size.menuButton / 2
                 ).path(in: bounds).cgPath
             },
-            motion: .palette)
+            motion: .palette,
+            keepsOpen: { popover.items[$0].keepsMenuOpen })
     }
 }
 

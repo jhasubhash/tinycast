@@ -7,6 +7,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case command
         case quickAction
         case customCommand
+        case assistant
         case snippet
         case systemAction
         case windowCommand
@@ -15,6 +16,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case appleShortcut
         case extensionCommand
         case meeting
+        case plugin
 
         var descriptor: KindDescriptor {
             switch self {
@@ -42,6 +44,11 @@ struct AppEntry: Identifiable, Hashable, Sendable {
                 return KindDescriptor(
                     label: "Custom Command", sectionTitle: "Custom Commands",
                     openVerb: "Run Custom Command", canHideFromSearch: false,
+                    canRevealInFinder: false, isSymbolIcon: true)
+            case .assistant:
+                return KindDescriptor(
+                    label: "Assistant", sectionTitle: "Assistants",
+                    openVerb: "Open Assistant", canHideFromSearch: true,
                     canRevealInFinder: false, isSymbolIcon: true)
             case .snippet:
                 return KindDescriptor(
@@ -84,6 +91,11 @@ struct AppEntry: Identifiable, Hashable, Sendable {
                 return KindDescriptor(
                     label: "Meeting", sectionTitle: "Meetings",
                     openVerb: "Join Meeting", canHideFromSearch: false,
+                    canRevealInFinder: false, isSymbolIcon: true)
+            case .plugin:
+                return KindDescriptor(
+                    label: "Plugin", sectionTitle: "Plugins",
+                    openVerb: "Open Plugin", canHideFromSearch: false,
                     canRevealInFinder: false, isSymbolIcon: true)
             }
         }
@@ -172,6 +184,8 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return bundleID.map { .settingsPane(bundleID: $0) }
         case .customCommand:
             return CustomCommand.id(fromEntryID: id).map { .customCommand(id: $0) }
+        case .assistant:
+            return Assistant.id(fromEntryID: id).map { .assistant(id: $0) }
         case .systemAction:
             return SystemActionCatalog.action(forEntryID: id).map { .systemAction(id: $0.id) }
         case .windowCommand:
@@ -182,7 +196,11 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return Quicklink.id(fromEntryID: id).map { .quicklink(id: $0) }
         case .appleShortcut:
             return AppleShortcut.id(fromEntryID: id).map { .appleShortcut(id: $0) }
-        case .snippet, .extensionCommand, .meeting:
+        case .extensionCommand:
+            return .extensionCommand(entryID: id)
+        case .plugin:
+            return .pluginCommand(entryID: id)
+        case .snippet, .meeting:
             return nil
         }
     }
@@ -206,6 +224,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case .quicklink: return Quicklink.sfSymbol
         case .snippet: return "text.quote"
         case .customCommand: return CustomCommand.sfSymbol
+        case .assistant: return "sparkles"
         case .command: return CommandCatalog.command(for: self)?.sfSymbol ?? "questionmark"
         case .quickAction:
             return CommandCatalog.command(for: self)?.sfSymbol ?? CustomQuickAction.sfSymbol
@@ -214,7 +233,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return WindowCommandCatalog.command(forEntryID: id)?.sfSymbol ?? "questionmark"
         case .windowLayout: return WindowLayout.sfSymbol
         case .meeting: return "video.fill"
-        case .application, .systemSettings, .appleShortcut, .extensionCommand: return "questionmark"
+        case .application, .systemSettings, .appleShortcut, .extensionCommand, .plugin: return "questionmark"
         }
     }
 
@@ -325,12 +344,14 @@ final class AppIndex {
 
     private var discoveredEntries: [AppEntry] = []
     private var customCommandEntries: [AppEntry] = []
+    private var assistantEntries: [AppEntry] = []
     private var windowCommandEntries: [AppEntry] = []
     private var windowLayoutEntries: [AppEntry] = []
     private var quicklinkEntries: [AppEntry] = []
     private var appleShortcutEntries: [AppEntry] = []
     private var customQuickActionEntries: [AppEntry] = []
     private var extensionEntries: [AppEntry] = []
+    private var pluginEntries: [AppEntry] = []
     private var meetingEntries: [AppEntry] = []
     /// The catalog's commands a disabled feature hides; the Commands slice is recomputed from it.
     private var hiddenCommands: Set<CommandID> = []
@@ -391,6 +412,24 @@ final class AppIndex {
         publishEntries()
     }
 
+    /// Replaces the assistant slice — each Assistant's "Ask <Name>" launcher command. The AI feature
+    /// gates it (nil `settingsOwner` would let a kind toggle steal it from AI's own switch).
+    func setAssistants(_ assistants: [Assistant]) {
+        let entries = assistants.map { assistant -> AppEntry in
+            let symbol =
+                NSImage(systemSymbolName: assistant.symbol, accessibilityDescription: nil) != nil
+                ? assistant.symbol : nil
+            return AppEntry(
+                id: assistant.entryID, name: "Ask \(assistant.name)",
+                url: URL(string: "tinycast://assistant/" + assistant.id.uuidString)!,
+                bundleID: nil, kind: .assistant, settingsOwner: .ai, symbolName: symbol)
+        }
+        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        guard entries != assistantEntries else { return }
+        assistantEntries = entries
+        publishEntries()
+    }
+
     /// Replaces the custom Quick Action slice, which shares its section with the shipped four.
     func setCustomQuickActions(_ actions: [CustomQuickAction]) {
         let entries = actions.sorted(by: CustomQuickAction.precedes).map(AppEntry.init)
@@ -429,6 +468,13 @@ final class AppIndex {
     func setExtensionCommands(_ entries: [AppEntry]) {
         guard entries != extensionEntries else { return }
         extensionEntries = entries
+        publishEntries()
+    }
+
+    /// Called by `PluginManager` when the installed native-plugin set changes.
+    func setPluginCommands(_ entries: [AppEntry]) {
+        guard entries != pluginEntries else { return }
+        pluginEntries = entries
         publishEntries()
     }
 
@@ -572,9 +618,10 @@ final class AppIndex {
         let updated =
             Self.named(meetingEntries) + discoveredEntries
             + Self.named(
-                extensionEntries + quicklinkEntries + appleShortcutEntries + snippetEntries
-                    + Self.systemActionEntries + windowLayoutEntries + windowCommandEntries
-                    + customCommandEntries + quickActionEntries + commandEntries)
+                extensionEntries + pluginEntries + quicklinkEntries + appleShortcutEntries
+                    + snippetEntries + Self.systemActionEntries
+                    + windowLayoutEntries + windowCommandEntries + customCommandEntries
+                    + assistantEntries + quickActionEntries + commandEntries)
         guard updated != apps else { return }
         apps = updated
         entriesRevision &+= 1

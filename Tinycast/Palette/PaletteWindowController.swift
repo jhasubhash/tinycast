@@ -376,6 +376,29 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
                 return false
             }
         }
+        // Typed keys while the alias editor is open on a ⌘K row: edit the draft, commit on ↵.
+        panel.onMenuInlineKey = { [weak self] event in
+            guard let self, let key = core.palette.aliasEditKey,
+                event.modifierFlags.isDisjoint(with: [.command, .control])
+            else { return false }
+            switch Int(event.keyCode) {
+            case kVK_Escape:
+                core.palette.aliasEditKey = nil
+            case kVK_Return, kVK_ANSI_KeypadEnter:
+                core.aliases.setAlias(core.palette.aliasDraft, for: key)
+                core.palette.aliasEditKey = nil
+            case kVK_Delete:
+                if !core.palette.aliasDraft.isEmpty { core.palette.aliasDraft.removeLast() }
+            default:
+                let printable = (event.characters ?? "").unicodeScalars.filter {
+                    $0.value >= 0x20 && $0.value != 0x7F && !(0xF700...0xF8FF).contains($0.value)
+                }
+                if !printable.isEmpty {
+                    core.palette.aliasDraft += String(String.UnicodeScalarView(printable))
+                }
+            }
+            return true
+        }
         self.panel = panel
         return panel
     }

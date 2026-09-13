@@ -985,6 +985,9 @@ struct RootPaletteView: View {
         menuPanel.hide()
         openMenu = nil
         argumentOptionsField = nil
+        // A menu carrying an open editor takes it down with it, and stops any live recording.
+        vm.aliasEditKey = nil
+        core.hotKeys.recordingAction = nil
     }
 
     /// Drives the menu's window from the two pieces of state that decide what it shows.
@@ -1092,11 +1095,13 @@ struct RootPaletteView: View {
         }
     }
 
-    /// The one activation path for a menu row: run its action, then close.
+    /// The one activation path for a menu row: run its action, then close — unless the row edits
+    /// in place, in which case the action opened an inline editor and the menu stays up for it.
     private func activateMenuItem(_ index: Int) {
         guard let content = menuContent, (0..<content.rowCount).contains(index) else { return }
         guard content.isSelectable(index) else { return }
         content.activate(index)
+        guard !content.keepsOpen(index) else { return }
         closeMenus()
         // A mouse click on a row takes the caret with it; menus close back into the field.
         if argumentFocused == nil { searchFocused = true }

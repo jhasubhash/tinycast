@@ -54,6 +54,10 @@ final class PaletteState {
     var commandArguments: [String: String] = [:]
     /// Set when the palette opens to fill one row's fields; the header focuses the first empty one.
     var pendingArgumentEntryID: String?
+    /// The alias key being edited on its ⌘K row, or nil; while set, the menu stays up for the field.
+    var aliasEditKey: String?
+    /// The alias being typed while `aliasEditKey` is set; the menu row reads it live.
+    var aliasDraft = ""
     /// True once ⌘ has been *held*, which numbers the favorite rows. The panel is the only writer.
     private(set) var commandHeld = false
     /// A chord is a tap, so the numbering waits out the tap before it claims the trailing labels.
@@ -143,6 +147,8 @@ final class PaletteState {
         isControlListOpen = false
         commandArguments = [:]
         pendingArgumentEntryID = nil
+        aliasEditKey = nil
+        aliasDraft = ""
         clipboardFilter = .all
         fileSearchFilter = .all
         emojiCategoryFilter = .all
