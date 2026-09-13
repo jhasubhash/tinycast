@@ -320,7 +320,9 @@ public struct PluginScaffold<Root: View>: View {
                         .frame(height: 32)
                 }
             )
-            .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+            // Overlaid, not inset: the content fills to the very bottom and dissolves under it,
+            // rather than stopping short of a reserved strip. Surfaces clear it with content margins.
+            .overlay(alignment: .bottom) { footer }
             .overlay(alignment: .bottomTrailing) {
                 if paletteOpen {
                     CommandPaletteView(
