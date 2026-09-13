@@ -87,6 +87,23 @@ lists are filtered by the host. A surface owns the entire panel and its own keyb
 the plugin's own text field is focused). Draw your own back control only if you want one — you never
 get a duplicate palette chevron over a surface.
 
+### A surface's scaffold
+
+A `.surface` owns the whole panel, so the framework hands it the chrome the host no longer draws.
+Wrap the surface's body in `PluginScaffold(navigator:primaryActionLabel:commands:listKey:) { root }`:
+
+- `PluginNavigator` — the surface's own view stack. `push(title:_:)` drills in; **Escape** pops it,
+  and once back at the root Escape leaves the plugin. No back chevron to wire — the scaffold draws
+  one and Escape drives it.
+- `commands:` — the `[PluginCommand]` for whatever view is on top, listed in a **⌘K** palette pinned
+  bottom-right. `PluginCommand(title:subtitle:icon:shortcut:action:)`; re-read each time it opens.
+- `listKey:` — ↑/↓/Return for a list on the current view. The scaffold reads these from its own
+  event monitor, so a list navigates even while a search field holds focus — or none does. Return
+  true when you consumed the key.
+
+The scaffold claims Escape, ⌘K and the list keys through a local monitor, ahead of the host, so a
+surface's keyboard never depends on which control is first responder.
+
 ## Writing a plugin
 
 The worked example is [`hello-plugin`](../../../tinycast_addons/extensions/hello-plugin/) — it shows

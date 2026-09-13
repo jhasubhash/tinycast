@@ -391,6 +391,8 @@ struct RootPaletteView: View {
             .onChange(of: pluginSurfaceActive) { _, active in
                 if active {
                     installPluginEscapeMonitor()
+                    // Drop the header's focus so the surface's own field can take the keyboard.
+                    searchFocused = false
                 } else {
                     removePluginEscapeMonitor()
                     // The surface held first responder; refocus the palette's field so its arrow and

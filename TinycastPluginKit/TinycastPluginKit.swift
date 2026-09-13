@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // MARK: - Metadata
@@ -182,5 +183,330 @@ public enum TinycastPluginRuntime {
     /// The host side of `export`: turn the opaque pointer back into a plugin. Balances the retain.
     public static func consume(_ pointer: UnsafeMutableRawPointer) -> (any TinycastPlugin)? {
         Unmanaged<AnyObject>.fromOpaque(pointer).takeRetainedValue() as? any TinycastPlugin
+    }
+}
+
+// MARK: - Surface navigation
+
+/// A plugin surface's own view stack. Push a view to drill in; Escape pops it, and once the stack
+/// is back at the root a further Escape leaves the plugin. A surface owns its whole navigation, so
+/// the host never draws a back chevron over one — the scaffold does, and Escape drives it.
+@MainActor
+@Observable
+public final class PluginNavigator {
+    struct Entry: Identifiable {
+        let id = UUID()
+        let title: String?
+        let view: AnyView
+    }
+
+    private(set) var stack: [Entry] = []
+
+    public init() {}
+
+    /// Drill into `view`; `title` shows in the scaffold's back control when set.
+    public func push(title: String? = nil, @ViewBuilder _ view: () -> some View) {
+        stack.append(Entry(title: title, view: AnyView(view())))
+    }
+
+    /// Pop one level; false when already at the root.
+    @discardableResult
+    public func pop() -> Bool { stack.popLast() != nil }
+
+    public func popToRoot() { stack.removeAll() }
+
+    /// True while a pushed view sits above the root.
+    public var canPop: Bool { !stack.isEmpty }
+
+    /// The title to show for the level under the top one, i.e. where a back step lands.
+    var backTitle: String? {
+        guard canPop else { return nil }
+        return stack.count >= 2 ? stack[stack.count - 2].title : nil
+    }
+}
+
+// MARK: - Command palette
+
+/// One row of a surface's ⌘K command palette. `shortcut` is a display hint only — the palette
+/// itself is opened with ⌘K and driven with the arrows and Return.
+public struct PluginCommand: Identifiable {
+    public let id: String
+    public var title: String
+    public var subtitle: String?
+    public var icon: PluginIcon
+    public var shortcut: String?
+    public var action: @MainActor () -> Void
+
+    public init(
+        id: String = UUID().uuidString,
+        title: String,
+        subtitle: String? = nil,
+        icon: PluginIcon = .symbol("bolt"),
+        shortcut: String? = nil,
+        action: @escaping @MainActor () -> Void
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.shortcut = shortcut
+        self.action = action
+    }
+}
+
+// MARK: - Scaffold
+
+/// The frame every native plugin surface should wrap its content in. It gives three things the host
+/// used to owe a surface and no longer does: a view stack whose back step is Escape, a ⌘K command
+/// palette pinned bottom-right whose rows the plugin supplies, and a footer that states both. It
+/// claims those keys through a local monitor, so they reach the surface whatever holds focus.
+///
+/// Escape pops the stack; at the root it falls through to the host, which leaves the plugin. ⌘K
+/// toggles the palette; while it is open the arrows and Return drive it and Escape closes it.
+@MainActor
+public struct PluginScaffold<Root: View>: View {
+    private let navigator: PluginNavigator
+    private let primaryLabel: String
+    private let commands: () -> [PluginCommand]
+    private let listKey: (PluginListKey) -> Bool
+    private let root: Root
+
+    @State private var paletteOpen = false
+    @State private var selection = 0
+    @State private var monitor = KeyMonitor()
+
+    /// - Parameters:
+    ///   - navigator: the surface's view stack; make one `@State` in your surface and pass it here.
+    ///   - primaryActionLabel: what Return does on the current view, shown in the footer (e.g. "Open").
+    ///   - commands: the ⌘K rows for whatever view is on top; re-read every time the palette opens.
+    ///   - listKey: ↑/↓/Return for a list on the current view, driven by the scaffold's own monitor
+    ///     so it never depends on which control holds focus. Return true when you consumed the key.
+    public init(
+        navigator: PluginNavigator,
+        primaryActionLabel: String = "",
+        commands: @escaping () -> [PluginCommand] = { [] },
+        listKey: @escaping (PluginListKey) -> Bool = { _ in false },
+        @ViewBuilder root: () -> Root
+    ) {
+        self.navigator = navigator
+        self.primaryLabel = primaryActionLabel
+        self.commands = commands
+        self.listKey = listKey
+        self.root = root()
+    }
+
+    public var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                stackedViews
+                footer
+            }
+            if paletteOpen {
+                CommandPaletteView(commands: currentCommands, selection: $selection, run: run)
+                    .padding(.trailing, 12)
+                    .padding(.bottom, 44)
+                    .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear { monitor.start(handler: handleKey) }
+        .onDisappear { monitor.stop() }
+    }
+
+    private var stackedViews: some View {
+        ZStack {
+            root
+                .opacity(navigator.canPop ? 0 : 1)
+                .allowsHitTesting(!navigator.canPop)
+            ForEach(navigator.stack) { entry in
+                let isTop = entry.id == navigator.stack.last?.id
+                entry.view
+                    .opacity(isTop ? 1 : 0)
+                    .allowsHitTesting(isTop)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var footer: some View {
+        HStack(spacing: 10) {
+            if navigator.canPop {
+                Label("Back", systemImage: "chevron.left")
+                    .labelStyle(.titleAndIcon)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                keycap("esc")
+            }
+            Spacer(minLength: 0)
+            if !primaryLabel.isEmpty {
+                Text(primaryLabel).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                keycap("↩")
+            }
+            if !currentCommands.isEmpty {
+                if !primaryLabel.isEmpty {
+                    Rectangle().fill(.secondary.opacity(0.25)).frame(width: 1, height: 14)
+                }
+                Button {
+                    paletteOpen.toggle()
+                    selection = 0
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Actions").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                        keycap("⌘").padding(.trailing, -3)
+                        keycap("K")
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 34)
+        .background(.thinMaterial)
+        .overlay(alignment: .top) { Rectangle().fill(.secondary.opacity(0.18)).frame(height: 1) }
+    }
+
+    private func keycap(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(minWidth: 16)
+            .padding(.horizontal, 4).padding(.vertical, 2)
+            .background(RoundedRectangle(cornerRadius: 4).fill(.secondary.opacity(0.14)))
+    }
+
+    private var currentCommands: [PluginCommand] { commands() }
+
+    private func run(_ index: Int) {
+        let rows = currentCommands
+        guard rows.indices.contains(index) else { return }
+        paletteOpen = false
+        rows[index].action()
+    }
+
+    /// Returns true to swallow the key, false to let the host see it.
+    private func handleKey(_ chord: KeyChord) -> Bool {
+        guard NSApp.keyWindow != nil else { return false }
+
+        if chord.command, chord.chars == "k" {
+            guard !currentCommands.isEmpty else { return false }
+            paletteOpen.toggle()
+            selection = 0
+            return true
+        }
+
+        if paletteOpen {
+            switch chord.keyCode {
+            case 53: paletteOpen = false
+            case 125: selection = min(selection + 1, max(currentCommands.count - 1, 0))
+            case 126: selection = max(selection - 1, 0)
+            case 36, 76: run(selection)
+            default: break
+            }
+            return true
+        }
+
+        if chord.bare {
+            switch chord.keyCode {
+            case 125: if listKey(.down) { return true }
+            case 126: if listKey(.up) { return true }
+            case 36, 76: if listKey(.submit) { return true }
+            case 53: return navigator.pop()
+            default: break
+            }
+        }
+        return false
+    }
+}
+
+/// A list key the scaffold routes to the current view through its own monitor, so a plugin's list
+/// navigates whatever holds focus — the search field, or nothing at all.
+public enum PluginListKey: Sendable {
+    case up
+    case down
+    case submit
+}
+
+/// The Sendable slice of a key event the scaffold's monitor hands to the main actor: an `NSEvent`
+/// itself is not Sendable, so only these primitives cross the hop.
+private struct KeyChord: Sendable {
+    let keyCode: UInt16
+    let command: Bool
+    let bare: Bool
+    let chars: String?
+}
+
+/// Holds a local key monitor for a scaffold's lifetime; a class so `@State` can own it across the
+/// view's value-type redraws and tear it down on disappear.
+@MainActor
+private final class KeyMonitor {
+    private var token: Any?
+
+    func start(handler: @escaping @MainActor (KeyChord) -> Bool) {
+        guard token == nil else { return }
+        token = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            let chord = KeyChord(
+                keyCode: event.keyCode,
+                command: mods == .command,
+                bare: mods.isEmpty,
+                chars: event.charactersIgnoringModifiers?.lowercased())
+            return MainActor.assumeIsolated { handler(chord) } ? nil : event
+        }
+    }
+
+    func stop() {
+        if let token { NSEvent.removeMonitor(token) }
+        token = nil
+    }
+
+    isolated deinit { if let token { NSEvent.removeMonitor(token) } }
+}
+
+/// The ⌘K palette itself: the plugin's rows, the arrows' highlight, and a click to run one.
+@MainActor
+private struct CommandPaletteView: View {
+    let commands: [PluginCommand]
+    @Binding var selection: Int
+    let run: (Int) -> Void
+
+    var body: some View {
+        VStack(spacing: 2) {
+            ForEach(Array(commands.enumerated()), id: \.element.id) { index, command in
+                row(command, selected: index == selection)
+                    .onTapGesture { run(index) }
+            }
+        }
+        .padding(6)
+        .frame(width: 260)
+        .background(RoundedRectangle(cornerRadius: 12).fill(.regularMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.secondary.opacity(0.2), lineWidth: 1))
+        .shadow(color: .black.opacity(0.3), radius: 16, y: 6)
+    }
+
+    private func row(_ command: PluginCommand, selected: Bool) -> some View {
+        HStack(spacing: 9) {
+            icon(command.icon).frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(command.title).font(.system(size: 12, weight: .medium))
+                if let subtitle = command.subtitle {
+                    Text(subtitle).font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 6)
+            if let shortcut = command.shortcut {
+                Text(shortcut).font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 7).fill(selected ? Color.accentColor.opacity(0.9) : .clear))
+        .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .contentShape(Rectangle())
+    }
+    @ViewBuilder
+    private func icon(_ icon: PluginIcon) -> some View {
+        switch icon {
+        case .symbol(let name): Image(systemName: name)
+        case .file(let url): Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().scaledToFit()
+        }
     }
 }
