@@ -19,6 +19,8 @@ final class PalettePanel: NSPanel {
     var onFieldEditorFocused: ((NSTextInputContext) -> Void)?
     /// Inline argument fields use arrows at their text boundaries to continue their focus ring.
     var onHeaderFieldBoundaryArrow: ((HeaderFieldBoundary) -> Bool)?
+    /// Keys typed while an inline ⌘K editor is open on a menu row; it consumes them itself.
+    var onMenuInlineKey: ((NSEvent) -> Bool)?
     /// Arms hover from `sendEvent`, the one place both event streams pass through.
     weak var paletteState: PaletteState? {
         didSet {
@@ -166,6 +168,10 @@ final class PalettePanel: NSPanel {
         // Before every other rule, so the arrows' own policies apply to the chords too.
         if event.type == .keyDown, let arrow = Self.emacsArrow(for: event) {
             sendEvent(arrow)
+            return
+        }
+        // An inline ⌘K editor claims the keys ahead of the freeze, so typing lands in its field.
+        if event.type == .keyDown, paletteState?.menuOpen == true, onMenuInlineKey?(event) == true {
             return
         }
         // A footer menu owns the keyboard. See docs/features/palette.md#menu-open-input-freeze.

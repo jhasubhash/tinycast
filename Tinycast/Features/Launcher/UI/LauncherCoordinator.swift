@@ -255,6 +255,22 @@ final class LauncherCoordinator {
         ranking.reset(itemKey: app.preferenceKey)
     }
 
+    /// Opens the alias editor on its own ⌘K row, seeded with the current alias; ↵ commits it.
+    func configureAlias(for app: AppEntry) {
+        guard !CommandCatalog.isQueryDriven(app) else { return }
+        let key = app.preferenceKey
+        core.hotKeys.recordingAction = nil
+        core.palette.aliasDraft = core.aliases.alias(for: key) ?? ""
+        core.palette.aliasEditKey = key
+    }
+
+    /// Starts listening on the shortcut row at once; capture assigns the chord with no confirmation.
+    func configureHotKey(for app: AppEntry) {
+        guard let action = app.hotKeyAction else { return }
+        core.palette.aliasEditKey = nil
+        core.hotKeys.recordingAction = action
+    }
+
     func showInFinder(_ app: AppEntry) {
         paletteCoordinator.hidePalette(restoreFocus: false)
         AppLauncher.showInFinder(app.url)

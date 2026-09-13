@@ -28,6 +28,10 @@ struct PopoverMenuItem {
     /// Destructive rows (delete) tint their icon + label red, matching the native menu convention.
     var isDestructive: Bool = false
     let action: () -> Void
+    /// A control drawn where this row's shortcut caps would be — an inline editor for the row.
+    var trailingAccessory: (@MainActor @Sendable () -> AnyView)?
+    /// Activating the row edits it in place instead of dismissing the menu.
+    var keepsMenuOpen = false
 
     init(
         title: String, icon: PopoverMenuIcon, isLoading: Bool = false, sectionTitle: String? = nil,
@@ -279,19 +283,23 @@ private struct PopoverMenuRow: View {
                     .foregroundStyle(item.isDestructive ? Color.red : Color.primary)
                     .lineLimit(1)
                 Spacer(minLength: metrics.spacing.sm)
-                if let detail = item.detail {
-                    Text(detail)
-                        // Smaller than the title it trails: a stated value, not a second label.
-                        .font(metrics.typography.keyCap)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        // A notation opens with what identifies it, so the tail is what can go.
-                        .truncationMode(.tail)
-                }
-                if let shortcut = item.shortcut {
-                    HStack(spacing: metrics.spacing.xxs) {
-                        ForEach(Array(shortcut.enumerated()), id: \.offset) { _, glyph in
-                            KeyCapChip(text: String(glyph), style: .outline)
+                if let accessory = item.trailingAccessory {
+                    accessory()
+                } else {
+                    if let detail = item.detail {
+                        Text(detail)
+                            // Smaller than the title it trails: a stated value, not a second label.
+                            .font(metrics.typography.keyCap)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            // A notation opens with what identifies it, so the tail is what can go.
+                            .truncationMode(.tail)
+                    }
+                    if let shortcut = item.shortcut {
+                        HStack(spacing: metrics.spacing.xxs) {
+                            ForEach(Array(shortcut.enumerated()), id: \.offset) { _, glyph in
+                                KeyCapChip(text: String(glyph), style: .outline)
+                            }
                         }
                     }
                 }

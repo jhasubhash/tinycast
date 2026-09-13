@@ -67,6 +67,25 @@ enum AppActionsMenu {
                     title: "Hide from Search", systemImage: "eye.slash", shortcut: "⇧⌘H",
                     action: onHideFromSearch))
         }
+        if isPersistent {
+            let key = app.preferenceKey
+            var alias = PopoverMenuItem(
+                title: "Change Alias", systemImage: "character.cursor.ibeam", startsSection: true
+            ) {
+                core.launcherCoordinator.configureAlias(for: app)
+            }
+            alias.trailingAccessory = LauncherInlineEditor.aliasBox(key: key)
+            alias.keepsMenuOpen = true
+            items.append(alias)
+            if let action = app.hotKeyAction {
+                var shortcut = PopoverMenuItem(title: "Change Shortcut", systemImage: "command") {
+                    core.launcherCoordinator.configureHotKey(for: app)
+                }
+                shortcut.trailingAccessory = LauncherInlineEditor.shortcutBox(action: action)
+                shortcut.keepsMenuOpen = true
+                items.append(shortcut)
+            }
+        }
         if running, app.kind == .application {
             items.append(
                 PopoverMenuItem(
