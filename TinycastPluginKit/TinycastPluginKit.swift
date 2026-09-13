@@ -269,6 +269,7 @@ public struct PluginScaffold<Root: View>: View {
     private let primaryLabel: String
     private let commands: () -> [PluginCommand]
     private let listKey: (PluginListKey) -> Bool
+    private let commandTitle: () -> String?
     private let root: Root
 
     @State private var paletteOpen = false
@@ -279,18 +280,21 @@ public struct PluginScaffold<Root: View>: View {
     ///   - navigator: the surface's view stack; make one `@State` in your surface and pass it here.
     ///   - primaryActionLabel: what Return does on the current view, shown in the footer (e.g. "Open").
     ///   - commands: the ⌘K rows for whatever view is on top; re-read every time the palette opens.
+    ///   - commandTitle: the heading atop the ⌘K palette — what the commands act on, e.g. a ticker.
     ///   - listKey: ↑/↓/Return for a list on the current view, driven by the scaffold's own monitor
     ///     so it never depends on which control holds focus. Return true when you consumed the key.
     public init(
         navigator: PluginNavigator,
         primaryActionLabel: String = "",
         commands: @escaping () -> [PluginCommand] = { [] },
+        commandTitle: @escaping () -> String? = { nil },
         listKey: @escaping (PluginListKey) -> Bool = { _ in false },
         @ViewBuilder root: () -> Root
     ) {
         self.navigator = navigator
         self.primaryLabel = primaryActionLabel
         self.commands = commands
+        self.commandTitle = commandTitle
         self.listKey = listKey
         self.root = root()
     }
@@ -302,7 +306,8 @@ public struct PluginScaffold<Root: View>: View {
                 footer
             }
             if paletteOpen {
-                CommandPaletteView(commands: currentCommands, selection: $selection, run: run)
+                CommandPaletteView(
+                    header: commandTitle(), commands: currentCommands, selection: $selection, run: run)
                     .padding(.trailing, 12)
                     .padding(.bottom, 44)
                     .transition(.opacity)
@@ -335,12 +340,12 @@ public struct PluginScaffold<Root: View>: View {
                     .labelStyle(.titleAndIcon)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
-                keycap("esc")
+                KeyCap(text: "esc")
             }
             Spacer(minLength: 0)
             if !primaryLabel.isEmpty {
                 Text(primaryLabel).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-                keycap("↩")
+                KeyCap(text: "↩")
             }
             if !currentCommands.isEmpty {
                 if !primaryLabel.isEmpty {
@@ -352,8 +357,8 @@ public struct PluginScaffold<Root: View>: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text("Actions").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-                        keycap("⌘").padding(.trailing, -3)
-                        keycap("K")
+                        KeyCap(text: "⌘").padding(.trailing, -3)
+                        KeyCap(text: "K")
                     }
                 }
                 .buttonStyle(.plain)
@@ -363,15 +368,6 @@ public struct PluginScaffold<Root: View>: View {
         .frame(height: 34)
         .background(.thinMaterial)
         .overlay(alignment: .top) { Rectangle().fill(.secondary.opacity(0.18)).frame(height: 1) }
-    }
-
-    private func keycap(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .frame(minWidth: 16)
-            .padding(.horizontal, 4).padding(.vertical, 2)
-            .background(RoundedRectangle(cornerRadius: 4).fill(.secondary.opacity(0.14)))
     }
 
     private var currentCommands: [PluginCommand] { commands() }
@@ -462,51 +458,95 @@ private final class KeyMonitor {
     isolated deinit { if let token { NSEvent.removeMonitor(token) } }
 }
 
-/// The ⌘K palette itself: the plugin's rows, the arrows' highlight, and a click to run one.
+/// The ⌘K palette: a titled panel in the shape of an extension's actions menu — a subtle
+/// selection wash, hierarchical glyphs and outline keycaps, never a bright accent fill.
 @MainActor
 private struct CommandPaletteView: View {
+    let header: String?
     let commands: [PluginCommand]
     @Binding var selection: Int
     let run: (Int) -> Void
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(alignment: .leading, spacing: 1) {
+            if let header, !header.isEmpty {
+                Text(header)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.tail)
+                    .padding(.horizontal, 10).padding(.top, 4).padding(.bottom, 2)
+            }
             ForEach(Array(commands.enumerated()), id: \.element.id) { index, command in
                 row(command, selected: index == selection)
                     .onTapGesture { run(index) }
             }
         }
         .padding(6)
-        .frame(width: 260)
-        .background(RoundedRectangle(cornerRadius: 12).fill(.regularMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.secondary.opacity(0.2), lineWidth: 1))
-        .shadow(color: .black.opacity(0.3), radius: 16, y: 6)
+        .frame(width: 300)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(.regularMaterial))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(.primary.opacity(0.14), lineWidth: 1))
+        .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
     }
 
     private func row(_ command: PluginCommand, selected: Bool) -> some View {
-        HStack(spacing: 9) {
-            icon(command.icon).frame(width: 16)
+        HStack(spacing: 8) {
+            glyph(command.icon).frame(width: 20, height: 20)
             VStack(alignment: .leading, spacing: 1) {
-                Text(command.title).font(.system(size: 12, weight: .medium))
+                Text(command.title).font(.body).lineLimit(1)
                 if let subtitle = command.subtitle {
-                    Text(subtitle).font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
-            Spacer(minLength: 6)
+            Spacer(minLength: 8)
             if let shortcut = command.shortcut {
-                Text(shortcut).font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                HStack(spacing: 2) {
+                    ForEach(Array(shortcut.enumerated()), id: \.offset) { _, ch in
+                        KeyCap(text: String(ch), outline: true)
+                    }
+                }
             }
         }
-        .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 7).fill(selected ? Color.accentColor.opacity(0.9) : .clear))
-        .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
         .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(selected ? Color.primary.opacity(0.10) : .clear))
     }
+
     @ViewBuilder
-    private func icon(_ icon: PluginIcon) -> some View {
+    private func glyph(_ icon: PluginIcon) -> some View {
         switch icon {
-        case .symbol(let name): Image(systemName: name)
-        case .file(let url): Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().scaledToFit()
+        case .symbol(let name):
+            Image(systemName: name).font(.body)
+                .symbolRenderingMode(.hierarchical).foregroundStyle(.secondary)
+        case .file(let url):
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().scaledToFit()
         }
+    }
+}
+
+/// A keycap chip: `.outline` for a row's shortcut hint, filled for the footer's own keys — the
+/// same two faces `KeyCapChip` wears in the host, restated here because chrome never crosses over.
+private struct KeyCap: View {
+    let text: String
+    var outline: Bool = false
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(minWidth: 18, minHeight: 18)
+            .padding(.horizontal, 4)
+            .background {
+                let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+                if outline {
+                    shape.strokeBorder(.primary.opacity(0.20), lineWidth: 1)
+                } else {
+                    shape.fill(.primary.opacity(0.08))
+                }
+            }
     }
 }
