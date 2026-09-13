@@ -67,8 +67,11 @@ enum PluginLoader {
             do { try data.write(to: dest, options: .atomic) } catch { return nil }
         }
         if let entries = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+            // Compare by filename: `contentsOfDirectory` resolves /var → /private/var, so the just-
+            // written `dest` is byte-identical yet URL-unequal, and a naive `url != dest` sweeps it.
             for url in entries
-            where url.lastPathComponent.hasPrefix(prefix) && url != dest {
+            where url.lastPathComponent.hasPrefix(prefix)
+                && url.lastPathComponent != dest.lastPathComponent {
                 try? fm.removeItem(at: url)  // stale copy of this plugin; a live mapping persists
             }
         }
