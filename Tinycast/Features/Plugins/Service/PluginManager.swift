@@ -35,6 +35,8 @@ final class PluginManager {
     private(set) var metadata: PluginMetadata?
     /// The running plugin's navigation stack, innermost last. Empty when nothing runs.
     private(set) var levels: [PluginLevel] = []
+    /// Bumped when the running plugin invalidates its rows, so `PluginScreen` re-asks `results`.
+    private(set) var resultsRevision = 0
 
     private(set) var isEnabled = false
     private(set) var showsInLauncher = true
@@ -175,6 +177,7 @@ final class PluginManager {
             runningID = install.id
             metadata = type(of: plugin).metadata
             levels = [.root]
+            plugin.bind { [weak self] in self?.reloadRows() }
             state = .active
         } catch {
             state = .failed(error.localizedDescription)
@@ -205,8 +208,14 @@ final class PluginManager {
         return nil
     }
 
+    /// The plugin says its rows changed; a bump re-renders `PluginScreen`, which re-asks `rows`.
+    func reloadRows() {
+        resultsRevision &+= 1
+    }
+
     /// The rows for the current level: the root re-asks the plugin, a child list filters its cache.
     func rows(query: String) -> [PluginResult] {
+        _ = resultsRevision  // observe, so a plugin-driven reload re-asks results below
         guard let plugin = loaded, let level = levels.last else { return [] }
         switch level {
         case .root:

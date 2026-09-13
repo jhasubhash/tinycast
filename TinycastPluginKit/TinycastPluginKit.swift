@@ -124,6 +124,13 @@ public protocol TinycastPlugin: AnyObject {
     /// Fixed identity, read once when the plugin loads.
     static var metadata: PluginMetadata { get }
 
+    /// The host calls this once, just after your plugin loads, handing you a closure that
+    /// invalidates your rows. Call it whenever `results(for:)` would now return something different
+    /// — async data arrived, a favourite toggled — and the palette re-asks `results(for:)`. Without
+    /// it, rows refresh only when the user types or navigates. Store the closure; a plugin whose
+    /// rows never change on their own can ignore this.
+    func bind(reload: @escaping () -> Void)
+
     /// The rows shown at the plugin's root, re-asked on every keystroke — filter on `context.query`.
     func results(for context: PluginContext) -> [PluginResult]
 
@@ -141,6 +148,7 @@ public extension TinycastPlugin {
     func children(of resultID: String, context: PluginContext) async -> [PluginResult] { [] }
     func perform(resultID: String, context: PluginContext) async -> PluginActionResult { .close }
     func surface(for resultID: String, context: PluginContext) -> AnyView { AnyView(EmptyView()) }
+    func bind(reload: @escaping () -> Void) {}
 }
 
 // MARK: - Loader handshake
