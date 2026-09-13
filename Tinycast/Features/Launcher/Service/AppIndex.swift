@@ -173,7 +173,9 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return WindowLayout.id(fromEntryID: id).map { .windowLayout(id: $0) }
         case .quicklink:
             return Quicklink.id(fromEntryID: id).map { .quicklink(id: $0) }
-        case .snippet, .extensionCommand, .meeting:
+        case .extensionCommand:
+            return .extensionCommand(entryID: id)
+        case .snippet, .meeting:
             return nil
         }
     }
