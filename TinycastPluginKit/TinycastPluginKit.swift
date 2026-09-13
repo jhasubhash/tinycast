@@ -333,41 +333,41 @@ public struct PluginScaffold<Root: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// No bar of its own — matches the palette's footer: frosted glass capsules floating over the
+    /// surface, bare until hover, with the same outline keycaps.
     private var footer: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             if navigator.canPop {
-                Label("Back", systemImage: "chevron.left")
-                    .labelStyle(.titleAndIcon)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                KeyCap(text: "esc")
+                GlassBarButton(action: { navigator.pop() }) {
+                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
+                    Text("Back")
+                    KeyCap(text: "esc", outline: true)
+                }
+                .glassEffect(.regular.interactive(), in: Capsule())
             }
             Spacer(minLength: 0)
-            if !primaryLabel.isEmpty {
-                Text(primaryLabel).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-                KeyCap(text: "↩")
-            }
-            if !currentCommands.isEmpty {
-                if !primaryLabel.isEmpty {
-                    Rectangle().fill(.secondary.opacity(0.25)).frame(width: 1, height: 14)
-                }
-                Button {
-                    paletteOpen.toggle()
-                    selection = 0
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("Actions").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-                        KeyCap(text: "⌘").padding(.trailing, -3)
-                        KeyCap(text: "K")
+            if !primaryLabel.isEmpty || !currentCommands.isEmpty {
+                HStack(spacing: 2) {
+                    if !primaryLabel.isEmpty {
+                        GlassBarButton(action: { _ = listKey(.submit) }) {
+                            Text(primaryLabel)
+                            KeyCap(text: "↩", outline: true)
+                        }
+                    }
+                    if !currentCommands.isEmpty {
+                        GlassBarButton(action: { paletteOpen.toggle(); selection = 0 }) {
+                            Text("Actions")
+                            KeyCap(text: "⌘", outline: true)
+                            KeyCap(text: "K", outline: true)
+                        }
                     }
                 }
-                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Capsule())
             }
         }
-        .padding(.horizontal, 14)
-        .frame(height: 34)
-        .background(.thinMaterial)
-        .overlay(alignment: .top) { Rectangle().fill(.secondary.opacity(0.18)).frame(height: 1) }
+        .padding(.horizontal, 10)
+        .frame(height: 44)
+        .frame(maxWidth: .infinity)
     }
 
     private var currentCommands: [PluginCommand] { commands() }
@@ -548,5 +548,27 @@ private struct KeyCap: View {
                     shape.fill(.primary.opacity(0.08))
                 }
             }
+    }
+}
+
+/// A footer control: bare until hover, then a faint capsule wash — the plugin's own `BarButton`,
+/// sat inside a frosted glass capsule by its caller.
+private struct GlassBarButton<Label: View>: View {
+    let action: () -> Void
+    @ViewBuilder let label: () -> Label
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) { label() }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .contentShape(Capsule())
+                .background(Capsule().fill(hovered ? Color.primary.opacity(0.08) : Color.clear))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
     }
 }
