@@ -1,4 +1,5 @@
 import SwiftUI
+import TinycastPluginKit
 
 struct RootPaletteView: View {
     @Environment(AppCore.self) private var core
@@ -41,10 +42,6 @@ struct RootPaletteView: View {
     @State private var hostWindow: NSWindow?
     /// The pending scroll request; modes are exclusive, so one piece of state serves all.
     @State private var scroll = ScrollIntent(kind: .top)
-    /// A local key monitor, live only while a plugin surface owns the panel, so Escape still exits
-    /// even when the plugin's own text field holds first responder.
-    @State private var pluginEscapeMonitor: Any?
-
     /// Compact vs. full; the source of truth is on `AppCore`, so the two can't disagree.
     private var isCollapsed: Bool { core.paletteCoordinator.paletteIsCollapsed }
 
@@ -385,50 +382,24 @@ struct RootPaletteView: View {
             .onDisappear {
                 menuPanel.hide()
                 (hostWindow as? PalettePanel)?.onHeaderFieldBoundaryArrow = nil
-                removePluginEscapeMonitor()
             }
             .onAppear { searchFocused = !screen.hidesSearchField }
             .onChange(of: pluginSurfaceActive) { _, active in
+                // Drop the header's focus so the surface's own field can take the keyboard; on the
+                // way out, refocus it a tick later, once the header field has remounted.
                 if active {
-                    installPluginEscapeMonitor()
-                    // Drop the header's focus so the surface's own field can take the keyboard.
                     searchFocused = false
-                } else {
-                    removePluginEscapeMonitor()
-                    // The surface held first responder; refocus the palette's field so its arrow and
-                    // Escape handlers get keys again on the plugin's list. Deferred a tick so the
-                    // header field it targets has remounted first.
-                    if vm.mode == .plugin {
-                        Task { @MainActor in searchFocused = true }
-                    }
+                } else if vm.mode == .plugin {
+                    Task { @MainActor in searchFocused = true }
                 }
             }
+            // A plugin surface owns Escape through its scaffold; this is how it leaves the plugin.
+            .environment(\.pluginExit) { core.pluginCoordinator.exitPluginScreen() }
             .modifier(SearchFieldHiding(hidden: hidesSearchField, apply: applySearchFieldHiding))
             // Several paths flip `paletteIsCollapsed`, so resize the window to match.
             .onChange(of: core.paletteCoordinator.paletteIsCollapsed) {
                 core.paletteCoordinator.syncPaletteSize()
             }
-    }
-
-    /// A plugin surface owns the keyboard through its own focused fields, so SwiftUI's `onKeyPress`
-    /// never sees Escape. A local monitor claims a bare Escape and pops the surface instead.
-    private func installPluginEscapeMonitor() {
-        guard pluginEscapeMonitor == nil else { return }
-        pluginEscapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard event.keyCode == 53,
-                event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
-                core.paletteCoordinator.isVisible, pluginSurfaceActive
-            else { return event }
-            core.pluginCoordinator.exitPluginScreen()
-            return nil
-        }
-    }
-
-    private func removePluginEscapeMonitor() {
-        if let monitor = pluginEscapeMonitor {
-            NSEvent.removeMonitor(monitor)
-            pluginEscapeMonitor = nil
-        }
     }
 
     /// Split from `body`: one chain of this length is past what the type-checker will infer.

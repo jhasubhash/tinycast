@@ -280,6 +280,7 @@ public struct PluginScaffold<Root: View>: View {
     private let commandTitle: () -> String?
     private let root: Root
 
+    @Environment(\.pluginExit) private var pluginExit
     @State private var paletteOpen = false
     @State private var selection = 0
     @State private var monitor = KeyMonitor()
@@ -310,22 +311,28 @@ public struct PluginScaffold<Root: View>: View {
     public var body: some View {
         // Refreshed every render so the monitor calls into the current state, not a stale snapshot.
         monitor.handler = handleKey
-        return ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
-                stackedViews
-                footer
+        return stackedViews
+            // Rows melt into the panel as they near the footer, as the palette's own lists do.
+            .mask(
+                VStack(spacing: 0) {
+                    Rectangle().fill(Color.black)
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 32)
+                }
+            )
+            .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+            .overlay(alignment: .bottomTrailing) {
+                if paletteOpen {
+                    CommandPaletteView(
+                        header: commandTitle(), commands: currentCommands, selection: $selection, run: run)
+                        .padding(.trailing, 12)
+                        .padding(.bottom, 44)
+                        .transition(.opacity)
+                }
             }
-            if paletteOpen {
-                CommandPaletteView(
-                    header: commandTitle(), commands: currentCommands, selection: $selection, run: run)
-                    .padding(.trailing, 12)
-                    .padding(.bottom, 44)
-                    .transition(.opacity)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onAppear { monitor.start() }
-        .onDisappear { monitor.stop() }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .onAppear { monitor.start() }
+            .onDisappear { monitor.stop() }
     }
 
     private var stackedViews: some View {
@@ -416,7 +423,7 @@ public struct PluginScaffold<Root: View>: View {
             case 125: if listKey(.down) { return true }
             case 126: if listKey(.up) { return true }
             case 36, 76: if listKey(.submit) { return true }
-            case 53: return navigator.pop()
+            case 53: if navigator.pop() { return true }; pluginExit(); return true
             default: break
             }
         }
@@ -584,5 +591,21 @@ private struct GlassBarButton<Label: View>: View {
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
+    }
+}
+
+// MARK: - Host bridge
+
+/// How a scaffold leaves the plugin: the host injects this, and the scaffold calls it when Escape
+/// is pressed with nothing left to pop. Owning Escape here — not in a host-side monitor — keeps the
+/// surface's own view stack authoritative, so a back step never skips straight out to the launcher.
+public struct PluginExitKey: EnvironmentKey {
+    public static let defaultValue: @MainActor () -> Void = {}
+}
+
+public extension EnvironmentValues {
+    var pluginExit: @MainActor () -> Void {
+        get { self[PluginExitKey.self] }
+        set { self[PluginExitKey.self] = newValue }
     }
 }
