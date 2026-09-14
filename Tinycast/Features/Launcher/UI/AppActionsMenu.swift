@@ -24,6 +24,23 @@ enum AppActionsMenu {
                 shortcut: "↵"
             ) { core.launcherCoordinator.launch(app, searchQuery: searchQuery) }
         ]
+        if app.kind == .quicklink, let id = Quicklink.id(fromEntryID: app.id),
+            let quicklink = core.quicklinks.quicklink(id: id)
+        {
+            items.append(
+                PopoverMenuItem(title: "Edit Quicklink", systemImage: "pencil") {
+                    core.paletteCoordinator.hidePalette(restoreFocus: false)
+                    core.quicklinkCoordinator.editQuicklink(quicklink)
+                })
+            var rename = PopoverMenuItem(
+                title: "Rename Quicklink", systemImage: "character.cursor.ibeam"
+            ) {
+                core.quicklinkCoordinator.configureRename(id: id)
+            }
+            rename.trailingAccessory = LauncherInlineEditor.renameBox(id: id)
+            rename.keepsMenuOpen = true
+            items.append(rename)
+        }
         if app.canRevealInFinder {
             items.append(
                 PopoverMenuItem(title: "Show in Finder", systemImage: "folder", shortcut: "⌘↵") {
@@ -137,17 +154,6 @@ enum AppActionsMenu {
             items.append(
                 PopoverMenuItem(title: "Uninstall Extension", systemImage: "trash", isDestructive: true) {
                     core.extensionCoordinator.confirmUninstall(app)
-                })
-        }
-        if app.kind == .quicklink, let id = Quicklink.id(fromEntryID: app.id),
-            let quicklink = core.quicklinks.quicklink(id: id)
-        {
-            items.append(
-                PopoverMenuItem(
-                    title: "Edit Quicklink", systemImage: "pencil", startsSection: true
-                ) {
-                    core.paletteCoordinator.hidePalette(restoreFocus: false)
-                    core.quicklinkCoordinator.editQuicklink(quicklink)
                 })
         }
         return PopoverMenuContent(header: app.name, items: items)

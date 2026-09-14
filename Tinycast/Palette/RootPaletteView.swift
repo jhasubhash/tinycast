@@ -961,6 +961,7 @@ struct RootPaletteView: View {
         argumentOptionsField = nil
         // A menu carrying an open editor takes it down with it, and stops any live recording.
         vm.aliasEditKey = nil
+        vm.renameEditID = nil
         core.hotKeys.recordingAction = nil
     }
 

@@ -256,6 +256,24 @@ final class QuicklinkCoordinator {
         settingsCoordinator.showSettings(tab: .quicklinks)
     }
 
+    /// Opens the inline rename editor on the quicklink's ⌘K row, seeded with its name; ↵ commits.
+    func configureRename(id: UUID) {
+        guard let quicklink = store.quicklink(id: id) else { return }
+        core.hotKeys.recordingAction = nil
+        core.palette.aliasEditKey = nil
+        core.palette.renameDraft = quicklink.name
+        core.palette.renameEditID = id
+    }
+
+    /// Commits an inline rename; a blank or unchanged name is left alone.
+    func renameQuicklink(id: UUID, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, var quicklink = store.quicklink(id: id), quicklink.name != trimmed
+        else { return }
+        quicklink.name = trimmed
+        try? store.update(quicklink)
+    }
+
     @discardableResult
     func replaceQuicklinks(_ incoming: [Quicklink]) -> Int {
         let previous = store.quicklinks
