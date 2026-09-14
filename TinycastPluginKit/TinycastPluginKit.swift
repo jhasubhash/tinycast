@@ -325,6 +325,7 @@ public struct PluginScaffold<Root: View>: View {
     @Environment(\.pluginExit) private var pluginExit
     @Environment(\.pluginToggleMainMenu) private var pluginToggleMainMenu
     @Environment(\.pluginMainMenuPinned) private var pluginMainMenuPinned
+    @Environment(\.pluginCopyRouteLink) private var pluginCopyRouteLink
     @State private var paletteOpen = false
     @State private var selection = 0
     @State private var paletteQuery = ""
@@ -439,19 +440,26 @@ public struct PluginScaffold<Root: View>: View {
 
     private var currentCommands: [PluginCommand] {
         var rows = commands()
-        let toggle: PluginCommand? = route().map { route in
+        let routeCommands: [PluginCommand] = route().map { route in
             let pinned = pluginMainMenuPinned(route)
-            return PluginCommand(
-                id: PluginCommand.mainMenuSlotID,
-                title: pinned ? "Remove from Main Menu" : "Add to Main Menu",
-                icon: .symbol(pinned ? "pin.slash" : "pin"),
-                action: { pluginToggleMainMenu(route) })
-        }
-        // A plugin that placed a `mainMenuSlot()` gets the toggle there; otherwise it lands at the end.
+            return [
+                PluginCommand(
+                    id: PluginCommand.mainMenuSlotID,
+                    title: pinned ? "Remove from Main Menu" : "Add to Main Menu",
+                    icon: .symbol(pinned ? "pin.slash" : "pin"),
+                    action: { pluginToggleMainMenu(route) }),
+                PluginCommand(
+                    id: "__tinycast_copy_deep_link__",
+                    title: "Copy Deep Link",
+                    icon: .symbol("link"),
+                    action: { pluginCopyRouteLink(route) }),
+            ]
+        } ?? []
+        // A plugin that placed a `mainMenuSlot()` gets these there; otherwise they land at the end.
         if let index = rows.firstIndex(where: { $0.id == PluginCommand.mainMenuSlotID }) {
-            if let toggle { rows[index] = toggle } else { rows.remove(at: index) }
-        } else if let toggle {
-            rows.append(toggle)
+            rows.replaceSubrange(index...index, with: routeCommands)
+        } else {
+            rows.append(contentsOf: routeCommands)
         }
         return rows
     }
@@ -960,6 +968,11 @@ public struct PluginMainMenuPinnedKey: EnvironmentKey {
     public static let defaultValue: @MainActor (PluginRoute) -> Bool = { _ in false }
 }
 
+/// How a scaffold copies the current view's deep link to the clipboard; the host encodes it.
+public struct PluginCopyRouteLinkKey: EnvironmentKey {
+    public static let defaultValue: @MainActor (PluginRoute) -> Void = { _ in }
+}
+
 public extension EnvironmentValues {
     var pluginExit: @MainActor () -> Void {
         get { self[PluginExitKey.self] }
@@ -972,5 +985,9 @@ public extension EnvironmentValues {
     var pluginMainMenuPinned: @MainActor (PluginRoute) -> Bool {
         get { self[PluginMainMenuPinnedKey.self] }
         set { self[PluginMainMenuPinnedKey.self] = newValue }
+    }
+    var pluginCopyRouteLink: @MainActor (PluginRoute) -> Void {
+        get { self[PluginCopyRouteLinkKey.self] }
+        set { self[PluginCopyRouteLinkKey.self] = newValue }
     }
 }

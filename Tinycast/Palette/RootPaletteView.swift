@@ -414,6 +414,7 @@ struct RootPaletteView: View {
             .environment(\.pluginExit) { core.pluginCoordinator.exitPluginScreen() }
             .environment(\.pluginToggleMainMenu) { core.pluginCoordinator.toggleRoutePin($0) }
             .environment(\.pluginMainMenuPinned) { core.pluginCoordinator.isRoutePinned($0) }
+            .environment(\.pluginCopyRouteLink) { core.pluginCoordinator.copyRouteLink($0) }
             .modifier(SearchFieldHiding(hidden: hidesSearchField, apply: applySearchFieldHiding))
             // Several paths flip `paletteIsCollapsed`, so resize the window to match.
             .onChange(of: core.paletteCoordinator.paletteIsCollapsed) {

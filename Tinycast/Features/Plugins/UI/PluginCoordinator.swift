@@ -146,6 +146,15 @@ final class PluginCoordinator {
         }
     }
 
+    /// The scaffold's "Copy Deep Link" command: put the current view's `tinycast://…` link on the
+    /// pasteboard.
+    func copyRouteLink(_ route: PluginRoute) {
+        guard let link = routeLink(for: route) else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(link, forType: .string)
+        core.showMessage("Copied deep link")
+    }
+
     /// Escape past an empty search field: pop the plugin's own stack, then leave the plugin.
     func exitPluginScreen() {
         if plugins.back() {
