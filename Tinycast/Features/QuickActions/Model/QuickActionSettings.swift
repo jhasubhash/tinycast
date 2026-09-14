@@ -8,6 +8,11 @@ struct QuickActionSettings: Equatable, Sendable {
     var targetLanguage: String = ""
     /// Route Translate through the AI model instead of Apple's translator — it reads romanized text.
     var translateWithAI: Bool = false
+    /// Auto-direction: text in `primaryLanguage` translates to secondary, anything else to primary.
+    var autoLanguageSwap: Bool = false
+    /// BCP-47; empty means the Mac's own language. The "home" side of the auto-direction pair.
+    var primaryLanguage: String = ""
+    var secondaryLanguage: String = ""
     private(set) var instructionOverrides: [BuiltInQuickAction: String] = [:]
 
     func previewsResult(_ action: QuickAction) -> Bool {

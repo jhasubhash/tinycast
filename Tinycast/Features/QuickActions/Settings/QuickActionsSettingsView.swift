@@ -192,14 +192,24 @@ struct QuickActionsSettingsView: View {
 
     private var languageSection: some View {
         Section {
-            Picker(selection: languageBinding) {
-                Text("Same as this Mac").tag("")
-                ForEach(core.quickActionCoordinator.offeredLanguages, id: \.minimalIdentifier) {
-                    Text(TextTranslator.displayName(of: $0)).tag($0.minimalIdentifier)
-                }
-            } label: {
-                SettingsRowTitle(.quickActionsTranslate, "Translate to")
-                Text("The panel can still translate into another language once it is open.")
+            Toggle(isOn: autoSwapBinding) {
+                SettingsRowTitle(.quickActionsTranslate, "Detect direction")
+                Text("Choose the language to translate into from the text you selected.")
+            }
+            if autoSwapBinding.wrappedValue {
+                languagePicker(
+                    "Primary language",
+                    "Your main language. Text in any other language is translated into it.",
+                    selection: primaryLanguageBinding)
+                languagePicker(
+                    "Secondary language",
+                    "What text already in the primary language is translated into.",
+                    selection: secondaryLanguageBinding)
+            } else {
+                languagePicker(
+                    "Translate to",
+                    "The panel can still translate into another language once it is open.",
+                    selection: languageBinding)
             }
             Toggle(isOn: translateWithAIBinding) {
                 SettingsRowTitle(.quickActionsTranslate, "Translate with AI")
@@ -209,15 +219,9 @@ struct QuickActionsSettingsView: View {
         } header: {
             SettingsSectionHeader(.quickActionsTranslate)
         } footer: {
-            Text(
-                translateWithAIBinding.wrappedValue
-                    ? "Translation is sent to the model chosen above, so it can read transliterated "
-                        + "text Apple's on-device translator cannot."
-                    : "Translation uses Apple's own translator on this Mac, so it costs nothing and "
-                        + "reaches no provider. A language downloads the first time you use it."
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text(translateFooter)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -235,6 +239,33 @@ struct QuickActionsSettingsView: View {
         return "\(model) (\(ChatGPTSubscription.Effort(id: effort, detail: nil).title))"
     }
 
+    private func languagePicker(
+        _ title: String, _ subtitle: String, selection: Binding<String>
+    ) -> some View {
+        Picker(selection: selection) {
+            Text("Same as this Mac").tag("")
+            ForEach(core.quickActionCoordinator.offeredLanguages, id: \.minimalIdentifier) {
+                Text(TextTranslator.displayName(of: $0)).tag($0.minimalIdentifier)
+            }
+        } label: {
+            SettingsRowTitle(.quickActionsTranslate, title)
+            Text(subtitle)
+        }
+    }
+
+    private var translateFooter: String {
+        if store.settings.autoLanguageSwap {
+            return "Translate reads the selection and picks the direction: text in the primary "
+                + "language becomes the secondary, and anything else becomes the primary. Romanized "
+                + "text like \u{201C}kya ho raha hai\u{201D} needs Translate with AI."
+        }
+        return store.settings.translateWithAI
+            ? "Translation is sent to the model chosen above, so it can read transliterated text "
+                + "Apple's on-device translator cannot."
+            : "Translation uses Apple's own translator on this Mac, so it costs nothing and reaches "
+                + "no provider. A language downloads the first time you use it."
+    }
+
     private var enabledBinding: Binding<Bool> {
         Binding(
             get: { appSettings.quickActionsEnabled },
@@ -245,6 +276,24 @@ struct QuickActionsSettingsView: View {
         Binding(
             get: { store.settings.previewsResult(action) },
             set: { store.settings.setPreviewsResult($0, for: action) })
+    }
+
+    private var autoSwapBinding: Binding<Bool> {
+        Binding(
+            get: { store.settings.autoLanguageSwap },
+            set: { store.settings.autoLanguageSwap = $0 })
+    }
+
+    private var primaryLanguageBinding: Binding<String> {
+        Binding(
+            get: { store.settings.primaryLanguage },
+            set: { store.settings.primaryLanguage = $0 })
+    }
+
+    private var secondaryLanguageBinding: Binding<String> {
+        Binding(
+            get: { store.settings.secondaryLanguage },
+            set: { store.settings.secondaryLanguage = $0 })
     }
 
     private func previewBinding(_ action: CustomQuickAction) -> Binding<Bool> {
