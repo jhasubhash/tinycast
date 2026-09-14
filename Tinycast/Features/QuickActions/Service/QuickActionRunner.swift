@@ -63,6 +63,33 @@ final class QuickActionRunner {
         return trimmed
     }
 
+    /// The Translate action's AI route: Apple's translator can't read transliterated text, so this
+    /// hands the model the target language instead of a source→target pair.
+    static func translate(
+        _ text: String, to languageName: String, using provider: any AIProvider,
+        onDelta: @MainActor (String) -> Void = { _ in }
+    ) async throws -> String {
+        let request = AIRequest(
+            instructions: QuickActionPrompt.translation(to: languageName),
+            messages: [
+                AIMessage(
+                    role: .user,
+                    text: QuickActionPrompt.message(for: .translate, selection: text))
+            ],
+            maxOutputTokens: maxOutputTokens(for: .translate, selection: text))
+        var out = ""
+        for try await event in provider.stream(request) {
+            guard case .text(let delta) = event else { continue }
+            out += delta
+            onDelta(delta)
+        }
+        let trimmed = out.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw AIProviderError.responseFailed("The model returned nothing.")
+        }
+        return trimmed
+    }
+
     /// The on-device window counts the prompt and the reply against one budget, so both need a cap.
     private static func maxOutputTokens(for action: QuickAction, selection: String) -> Int {
         let approximateTokens = max(selection.count / 3, 64)

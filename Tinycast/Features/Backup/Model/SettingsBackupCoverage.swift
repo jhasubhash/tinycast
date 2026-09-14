@@ -142,6 +142,16 @@ enum SettingsBackupCoverage {
         AppSettingsKey.quickActionInstructions.rawValue:
             "Custom model instructions change transformed results and must not move unseen.",
         AppSettingsKey.quickActionLanguage.rawValue:
-            "Follows the language the person at this Mac reads, not the one who wrote the backup."
+            "Follows the language the person at this Mac reads, not the one who wrote the backup.",
+        AppSettingsKey.quickActionTranslateWithAI.rawValue:
+            "Routes selected text to an AI provider instead of the on-device translator; an import "
+            + "must not redirect a person's text off-device.",
+        AppSettingsKey.quickActionAutoLanguageSwap.rawValue:
+            "Changes which direction Translate runs against the reader's own text; a decision each "
+            + "Mac makes for itself.",
+        AppSettingsKey.quickActionPrimaryLanguage.rawValue:
+            "Follows the languages the person at this Mac reads, not the one who wrote the backup.",
+        AppSettingsKey.quickActionSecondaryLanguage.rawValue:
+            "Follows the languages the person at this Mac reads, not the one who wrote the backup."
     ]
 }

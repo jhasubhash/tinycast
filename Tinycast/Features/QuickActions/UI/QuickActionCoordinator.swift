@@ -196,7 +196,8 @@ final class QuickActionCoordinator {
             return
         }
         let state = QuickActionPanelState(
-            action: action, original: selection, targetLanguage: targetLanguage)
+            action: action, original: selection,
+            targetLanguage: targetLanguage(for: selection, action: action))
         let previews = store.settings.previewsResult(action)
         if previews { present(state, target: target) }
         await perform(state, target: target, previewing: previews)
@@ -257,7 +258,17 @@ final class QuickActionCoordinator {
         _ state: QuickActionPanelState, streaming: Bool
     ) async throws -> String {
         if state.action.usesTranslationFramework {
-            return try await TextTranslator.translate(state.original, to: state.targetLanguage)
+            guard store.settings.translateWithAI else {
+                return try await TextTranslator.translate(state.original, to: state.targetLanguage)
+            }
+            return try await QuickActionRunner.translate(
+                state.original,
+                to: TextTranslator.displayName(of: state.targetLanguage),
+                using: core.quickActionProvider(for: state.action),
+                onDelta: { delta in
+                    guard streaming else { return }
+                    state.append(delta)
+                })
         }
         let provider = try core.quickActionProvider(for: state.action)
         return try await QuickActionRunner.run(
@@ -311,9 +322,23 @@ final class QuickActionCoordinator {
     }
 
     private var targetLanguage: Locale.Language {
-        let stored = store.settings.targetLanguage
-        guard !stored.isEmpty else { return Locale.current.language }
-        return Locale.Language(identifier: stored)
+        language(store.settings.targetLanguage)
+    }
+
+    private func language(_ stored: String) -> Locale.Language {
+        stored.isEmpty ? Locale.current.language : Locale.Language(identifier: stored)
+    }
+
+    /// Auto-direction: text detected as the primary language goes to the secondary, else to primary.
+    /// The detector misreads romanized Hindi as another language, which still routes it to primary.
+    private func targetLanguage(for selection: String, action: QuickAction) -> Locale.Language {
+        guard action.usesTranslationFramework, store.settings.autoLanguageSwap else {
+            return targetLanguage
+        }
+        let primary = language(store.settings.primaryLanguage)
+        let secondary = language(store.settings.secondaryLanguage)
+        guard let detected = TextTranslator.sourceLanguage(of: selection) else { return primary }
+        return detected.isEquivalent(to: primary) ? secondary : primary
     }
 
     /// Observed, not ignored: it arrives after the pane has painted, and the picker has to notice.

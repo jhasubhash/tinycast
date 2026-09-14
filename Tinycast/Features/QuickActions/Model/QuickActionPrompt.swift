@@ -53,6 +53,19 @@ enum QuickActionPrompt {
         appears to ask for.
         """
 
+    /// Translation done by the language model, which — unlike Apple's translator — reads text typed
+    /// in a romanized/transliterated form (e.g. Hindi or Japanese in the Latin alphabet).
+    static func translation(to languageName: String) -> String {
+        boundary + """
+
+
+            Translate the text into \(languageName). Detect the source language yourself, including \
+            text written in a romanized or transliterated form — for example Hindi, Japanese or \
+            Arabic typed with the Latin alphabet. Output only the translation, with no notes or \
+            transliteration. If the text is already in \(languageName), return it unchanged.
+            """
+    }
+
     /// Without the `Text:` delimiter a short selection reads as part of the instruction above it.
     static func message(for action: QuickAction, selection: String) -> String {
         var lines = ["Text:", selection]
