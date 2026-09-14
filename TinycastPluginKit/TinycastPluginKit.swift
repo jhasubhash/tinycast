@@ -313,7 +313,8 @@ public struct PluginScaffold<Root: View>: View {
     private let route: () -> PluginRoute?
 
     @Environment(\.pluginExit) private var pluginExit
-    @Environment(\.pluginAddToMainMenu) private var pluginAddToMainMenu
+    @Environment(\.pluginToggleMainMenu) private var pluginToggleMainMenu
+    @Environment(\.pluginMainMenuPinned) private var pluginMainMenuPinned
     @State private var paletteOpen = false
     @State private var selection = 0
     @State private var paletteQuery = ""
@@ -429,11 +430,12 @@ public struct PluginScaffold<Root: View>: View {
     private var currentCommands: [PluginCommand] {
         var rows = commands()
         if let route = route() {
+            let pinned = pluginMainMenuPinned(route)
             rows.append(PluginCommand(
-                id: "__tinycast_add_to_main_menu__",
-                title: "Add to Main Menu",
-                icon: .symbol("pin"),
-                action: { pluginAddToMainMenu(route) }))
+                id: "__tinycast_toggle_main_menu__",
+                title: pinned ? "Remove from Main Menu" : "Add to Main Menu",
+                icon: .symbol(pinned ? "pin.slash" : "pin"),
+                action: { pluginToggleMainMenu(route) }))
         }
         return rows
     }
@@ -931,10 +933,15 @@ public struct PluginExitKey: EnvironmentKey {
     public static let defaultValue: @MainActor () -> Void = {}
 }
 
-/// How a scaffold pins the current view to the launcher: the host injects this, and the scaffold's
-/// auto-added "Add to Main Menu" command calls it with the view's ``PluginRoute``.
-public struct PluginAddToMainMenuKey: EnvironmentKey {
+/// How a scaffold pins/unpins the current view to the launcher, plus whether it already is: the
+/// host injects both, keyed on the route so a renamed pin still resolves. The scaffold's auto-added
+/// command toggles on the pinned state.
+public struct PluginToggleMainMenuKey: EnvironmentKey {
     public static let defaultValue: @MainActor (PluginRoute) -> Void = { _ in }
+}
+
+public struct PluginMainMenuPinnedKey: EnvironmentKey {
+    public static let defaultValue: @MainActor (PluginRoute) -> Bool = { _ in false }
 }
 
 public extension EnvironmentValues {
@@ -942,8 +949,12 @@ public extension EnvironmentValues {
         get { self[PluginExitKey.self] }
         set { self[PluginExitKey.self] = newValue }
     }
-    var pluginAddToMainMenu: @MainActor (PluginRoute) -> Void {
-        get { self[PluginAddToMainMenuKey.self] }
-        set { self[PluginAddToMainMenuKey.self] = newValue }
+    var pluginToggleMainMenu: @MainActor (PluginRoute) -> Void {
+        get { self[PluginToggleMainMenuKey.self] }
+        set { self[PluginToggleMainMenuKey.self] = newValue }
+    }
+    var pluginMainMenuPinned: @MainActor (PluginRoute) -> Bool {
+        get { self[PluginMainMenuPinnedKey.self] }
+        set { self[PluginMainMenuPinnedKey.self] = newValue }
     }
 }

@@ -108,10 +108,32 @@ final class PluginCoordinator {
         runPlugin(install, route: payload)
     }
 
-    /// The scaffold's "Add to Main Menu" command: pin the running plugin's current view as a Quicklink.
-    func pinRoute(_ route: PluginRoute) {
-        guard let identifier = plugins.runningIdentifier else { return }
-        let link = PluginRouteURL.encode(identifier: identifier, payload: route.payload)
+    private func routeLink(for route: PluginRoute) -> String? {
+        guard let identifier = plugins.runningIdentifier else { return nil }
+        return PluginRouteURL.encode(identifier: identifier, payload: route.payload)
+    }
+
+    /// Whether the running view is already on the launcher — matched by route link, not name, so a
+    /// renamed pin still resolves.
+    func isRoutePinned(_ route: PluginRoute) -> Bool {
+        guard let link = routeLink(for: route) else { return false }
+        return core.quicklinks.quicklinks.contains { $0.link == link }
+    }
+
+    /// The scaffold's Add/Remove command: pin the current view as a Quicklink, or remove every
+    /// Quicklink that points at it (name-independent, so dupes and renames both resolve).
+    func toggleRoutePin(_ route: PluginRoute) {
+        guard let link = routeLink(for: route) else { return }
+        let existing = core.quicklinks.quicklinks.filter { $0.link == link }
+        guard !existing.isEmpty else { return pin(route, link: link) }
+        let name = existing.first?.name ?? route.title
+        for quicklink in existing {
+            Task { await core.quicklinkCoordinator.deleteQuicklink(id: quicklink.id, confirming: false) }
+        }
+        core.showMessage("Removed “\(name)” from the launcher")
+    }
+
+    private func pin(_ route: PluginRoute, link: String) {
         let iconSymbol: String? = {
             if case .symbol(let name) = route.icon { return name } else { return nil }
         }()
@@ -145,7 +167,7 @@ final class PluginCoordinator {
             guard
                 await core.confirm(
                     title: "Uninstall \(install.manifest.name)?",
-                    message: "Removes the plugin's folder and its commands leave the launcher.",
+                    message: "Removes the plugin's folder; its commands and any pinned views leave the launcher.",
                     symbol: "trash", confirmTitle: "Uninstall")
             else { return }
             plugins.uninstall(install)
@@ -163,6 +185,16 @@ final class PluginCoordinator {
         core.favorites.remove(keys: Set(entryIDs))
         core.visibility.removeItemKeys(Set(entryIDs))
         core.aliases.removeKeys(Set(entryIDs))
+        // Pinned deep links are quicklinks keyed by the plugin's identifier, not its entry id, so
+        // they outlive the entry-id prune above — remove them here or they become dead no-ops.
+        let identifiers = Set(entryIDs.compactMap { PluginInstall.identifier(fromEntryID: $0) })
+        let orphaned = core.quicklinks.quicklinks.filter { quicklink in
+            guard let route = PluginRouteURL.decode(quicklink.link) else { return false }
+            return identifiers.contains(route.identifier)
+        }
+        for quicklink in orphaned {
+            Task { await core.quicklinkCoordinator.deleteQuicklink(id: quicklink.id, confirming: false) }
+        }
     }
 }
 

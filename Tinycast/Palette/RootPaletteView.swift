@@ -412,7 +412,8 @@ struct RootPaletteView: View {
             }
             // A plugin surface owns Escape through its scaffold; this is how it leaves the plugin.
             .environment(\.pluginExit) { core.pluginCoordinator.exitPluginScreen() }
-            .environment(\.pluginAddToMainMenu) { route in core.pluginCoordinator.pinRoute(route) }
+            .environment(\.pluginToggleMainMenu) { core.pluginCoordinator.toggleRoutePin($0) }
+            .environment(\.pluginMainMenuPinned) { core.pluginCoordinator.isRoutePinned($0) }
             .modifier(SearchFieldHiding(hidden: hidesSearchField, apply: applySearchFieldHiding))
             // Several paths flip `paletteIsCollapsed`, so resize the window to match.
             .onChange(of: core.paletteCoordinator.paletteIsCollapsed) {
