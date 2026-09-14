@@ -820,63 +820,42 @@ struct RootPaletteView: View {
     private func bottomBar(
         pillLabel: String, showActionGroup: Bool, formPrimaryShortcut: Bool, showActions: Bool
     ) -> some View {
-        // Floating controls, no bar; the edge dissolve ghosts the rows passing beneath.
-        HStack(spacing: 0) {
-            appMenuButton
-            Spacer()
-            if showActionGroup {
-                actionGroup(
-                    pillLabel: pillLabel, formPrimaryShortcut: formPrimaryShortcut,
-                    showActions: showActions)
-            }
-        }
-        .padding(.horizontal, metrics.spacing.md)
-        .frame(height: metrics.size.bottomBarHeight)
-        .frame(maxWidth: .infinity)
+        // The shared ActionBar — the same bar extensions and native plugins render — styled from
+        // Theme so the launcher's footer keeps tracking Theme and the UI-size setting.
+        ActionBar(
+            ActionBarModel(
+                leading: .menu {
+                    if openMenu == .app { closeMenus() } else { open(.app, highlighting: 0) }
+                },
+                primary: showActionGroup
+                    ? ActionBarItem(
+                        title: pillLabel, keys: formPrimaryShortcut ? ["⌘", "↵"] : ["↵"],
+                        tint: pillTint, action: activateSelection)
+                    : nil,
+                actions: showActionGroup && showActions
+                    ? ActionBarItem(
+                        title: "Actions", keys: ["⌘", "K"], tint: Theme.Colors.textSecondary,
+                        action: toggleActions)
+                    : nil),
+            style: actionBarStyle)
     }
 
-    private var appMenuButton: some View {
-        MenuCircleButton {
-            if openMenu == .app { closeMenus() } else { open(.app, highlighting: 0) }
-        }
-    }
-
-    /// The footer control group: primary action and the Actions toggle sharing one glass capsule.
-    private func actionGroup(
-        pillLabel: String, formPrimaryShortcut: Bool, showActions: Bool
-    ) -> some View {
-        HStack(spacing: 2) {
-            BarButton(action: activateSelection) {
-                HStack(spacing: metrics.spacing.sm) {
-                    Text(pillLabel)
-                        .font(metrics.typography.bar)
-                        .foregroundStyle(pillTint)
-                    if formPrimaryShortcut {
-                        HStack(spacing: metrics.spacing.xxs) {
-                            KeyCapChip(text: "⌘", style: .outline)
-                            KeyCapChip(text: "↵", style: .outline)
-                        }
-                    } else {
-                        KeyCapChip(text: "↵", style: .outline)
-                    }
-                }
-            }
-            if showActions {
-                BarButton(action: toggleActions) {
-                    HStack(spacing: metrics.spacing.sm) {
-                        Text("Actions")
-                            .font(metrics.typography.bar)
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                        HStack(spacing: metrics.spacing.xxs) {
-                            KeyCapChip(text: "⌘", style: .outline)
-                            KeyCapChip(text: "K", style: .outline)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(metrics.spacing.xs)
-        .frosted(in: Capsule())
+    /// Binds the shared bar to Theme and the current UI-size metrics, so it renders identically to
+    /// the plugin default while still following the app's own tokens.
+    private var actionBarStyle: ActionBarStyle {
+        ActionBarStyle(
+            barHeight: metrics.size.bottomBarHeight,
+            buttonHeight: metrics.size.barButtonHeight,
+            menuButtonSize: metrics.size.menuButton,
+            horizontalInset: metrics.spacing.md,
+            buttonPadding: metrics.spacing.md,
+            groupSpacing: metrics.spacing.xxs,
+            labelSpacing: metrics.spacing.sm,
+            font: metrics.typography.bar,
+            keyCapSize: metrics.size.keyCap,
+            keyCapFont: metrics.typography.keyCap,
+            hover: Theme.Colors.rowHover,
+            frost: Theme.Colors.glassFrost)
     }
 
     /// The one path opening the Actions menu, sampling the state its rows depend on.
@@ -1210,29 +1189,6 @@ private struct SearchFieldHiding: ViewModifier {
 
     func body(content: Content) -> some View {
         content.onChange(of: hidden) { _, hidden in apply(hidden) }
-    }
-}
-
-/// The footer's menu circle; hover lives here, so a sweep never re-renders the body.
-private struct MenuCircleButton: View {
-    let action: () -> Void
-    @State private var hovered = false
-    @Environment(\.metrics) private var metrics
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 3) {
-                Capsule().frame(width: 14, height: 1.5)
-                Capsule().frame(width: 8, height: 1.5)
-            }
-            .foregroundStyle(Theme.Colors.textSecondary)
-            .frame(width: metrics.size.menuButton, height: metrics.size.menuButton)
-            .background(Circle().fill(hovered ? Theme.Colors.rowHover : Color.clear))
-            .contentShape(.circle)
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
-        .frosted(in: Circle())
     }
 }
 

@@ -563,3 +563,15 @@ The same show also mirrors that app into `PaletteState.pasteTarget` (a `PasteTar
 name + bundle path), so Clipboard and Emoji can name it — the footer pill reads "Paste to Notes" and
 the ⌘K paste rows carry the app's icon. Resolved once per summon, never per render, and deliberately
 not cleared by `prepare` (pop-to-root resets the screen, not the target).
+
+## The footer is the shared `ActionBar`
+
+`RootPaletteView.bottomBar` doesn't draw its own controls: it builds an `ActionBarModel` (the app
+menu as the leading hamburger, the primary action, the Actions ⌘K toggle) and renders
+`ActionBar` from `TinycastPluginKit` with an `actionBarStyle` derived from `Theme` and the current
+`InterfaceMetrics`. That is the *same* bar the native plugins' `PluginScaffold` draws and the same one
+an extension command rides (its list renders into the palette, so it gets `bottomBar` around it), so
+all three surfaces share one implementation. The tokens stay in `Theme` — they're passed in as the
+style, not baked into the SDK — so the launcher footer still follows Theme and the UI-size setting,
+while a plugin that supplies no style gets matching defaults. The bar lives in the SDK because it's
+the one module both the app and third-party plugin dylibs link; that makes `ActionBar` public API.

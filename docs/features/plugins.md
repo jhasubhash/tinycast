@@ -105,9 +105,20 @@ Wrap the surface's body in
 - `listKey:` — `↑/↓/←/→/Return` (`PluginListKey`) for a list on the current view, read from the
   scaffold's own monitor so it works whatever holds focus. Return true when you consumed the key;
   ←/→ can drive a second axis, or fall through to the search caret when you return false.
+- `escape:` — **Escape**, offered to the surface before the stack pops and before the plugin is
+  left, so a surface unwinds a step at a time: a live search clears back to its list, and only then
+  does a further press go back or out. Return true when you consumed it.
+- A **bare backspace** is the surface's own: everywhere else in the palette it takes Escape's back
+  step once the query is empty, but a surface owns its search field and the host cannot see whether
+  that field still holds text, so the key is left to it. Escape is the way back out. A plugin still
+  on the row model keeps the palette's rule, stepping back one of its own list levels per press.
 
-The scaffold overlays a translucent footer and masks a bottom fade, so content fills to the edge and
-dissolves under it — give scroll views `.contentMargins(.bottom, …)` so the last row clears the footer.
+The scaffold's footer is the shared `ActionBar` from `TinycastPluginKit` — the same bar the launcher
+and JS extensions render (the app builds it in `RootPaletteView.bottomBar` with a Theme-derived
+`ActionBarStyle`; the scaffold uses the default). `.standard` fills it from the surface's Back state,
+`primaryActionLabel` and commands; a surface passes `footer: .hidden` for a full-bleed view or
+`.custom { AnyView(…) }` to draw its own. It floats over a bottom fade so content dissolves under it
+— give scroll views `.contentMargins(.bottom, …)` so the last row clears it.
 
 The full authoring guide — focus/layout gotchas and a worked example — lives beside the plugins:
 `tinycast_addons/extensions/SWIFT_PLUGINS.md`.

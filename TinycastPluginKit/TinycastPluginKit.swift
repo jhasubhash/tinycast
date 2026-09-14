@@ -281,9 +281,9 @@ public struct PluginScaffold<Root: View>: View {
     private let escape: () -> Bool
     private let commandTitle: () -> String?
     private let root: Root
+    private let footerKind: PluginFooter
 
     @Environment(\.pluginExit) private var pluginExit
-    @Environment(\.colorScheme) private var colorScheme
     @State private var paletteOpen = false
     @State private var selection = 0
     @State private var paletteQuery = ""
@@ -298,6 +298,8 @@ public struct PluginScaffold<Root: View>: View {
     ///     so it never depends on which control holds focus. Return true when you consumed the key.
     ///   - escape: Escape, offered to the surface before the stack pops and before the plugin is left,
     ///     so a live search can be cleared first. Return true when you consumed the key.
+    ///   - footer: the footer bar. `.standard` builds the shared ``ActionBar`` from the labels above;
+    ///     `.hidden` drops it; `.custom` supplies your own bar.
     public init(
         navigator: PluginNavigator,
         primaryActionLabel: String = "",
@@ -305,6 +307,7 @@ public struct PluginScaffold<Root: View>: View {
         commandTitle: @escaping () -> String? = { nil },
         listKey: @escaping (PluginListKey) -> Bool = { _ in false },
         escape: @escaping () -> Bool = { false },
+        footer: PluginFooter = .standard,
         @ViewBuilder root: () -> Root
     ) {
         self.navigator = navigator
@@ -313,6 +316,7 @@ public struct PluginScaffold<Root: View>: View {
         self.commandTitle = commandTitle
         self.listKey = listKey
         self.escape = escape
+        self.footerKind = footer
         self.root = root()
     }
 
@@ -364,43 +368,30 @@ public struct PluginScaffold<Root: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// No bar of its own — matches the palette's footer: real Liquid Glass capsules (so they follow
-    /// the app's transparency), frosted like the host's, bare until hover, with outline keycaps.
-    private var footer: some View {
-        HStack(spacing: 8) {
-            if navigator.canPop {
-                HStack(spacing: 2) {
-                    GlassBarButton(action: { navigator.pop() }) {
-                        Image(systemName: "chevron.left").font(.callout.weight(.semibold))
-                        Text("Back")
-                        KeyCap(text: "esc", outline: true)
-                    }
-                }
-                .modifier(FrostedCapsule(scheme: colorScheme))
-            }
-            Spacer(minLength: 0)
-            if !primaryLabel.isEmpty || !currentCommands.isEmpty {
-                HStack(spacing: 2) {
-                    if !primaryLabel.isEmpty {
-                        GlassBarButton(action: { _ = listKey(.submit) }) {
-                            Text(primaryLabel)
-                            KeyCap(text: "↩", outline: true)
-                        }
-                    }
-                    if !currentCommands.isEmpty {
-                        GlassBarButton(action: togglePalette) {
-                            Text("Actions")
-                            KeyCap(text: "⌘", outline: true)
-                            KeyCap(text: "K", outline: true)
-                        }
-                    }
-                }
-                .modifier(FrostedCapsule(scheme: colorScheme))
-            }
+    /// The footer bar. `.standard` renders the shared ``ActionBar`` — the same one the launcher and
+    /// extensions use — built from this surface's Back state, primary label and ⌘K commands.
+    @ViewBuilder private var footer: some View {
+        switch footerKind {
+        case .standard:
+            ActionBar(standardFooterModel)
+        case .hidden:
+            EmptyView()
+        case .custom(let build):
+            build()
         }
-        .padding(.horizontal, 8)
-        .frame(height: 52)
-        .frame(maxWidth: .infinity)
+    }
+
+    private var standardFooterModel: ActionBarModel {
+        ActionBarModel(
+            leading: navigator.canPop ? .back { navigator.pop() } : nil,
+            primary: primaryLabel.isEmpty
+                ? nil
+                : ActionBarItem(title: primaryLabel, keys: ["↩"], tint: .primary) {
+                    _ = listKey(.submit)
+                },
+            actions: currentCommands.isEmpty
+                ? nil
+                : ActionBarItem(title: "Actions", keys: ["⌘", "K"]) { togglePalette() })
     }
 
     private var currentCommands: [PluginCommand] { commands() }
@@ -647,17 +638,228 @@ private struct CommandPaletteView: View {
     }
 }
 
-/// A keycap chip: `.outline` for a row's shortcut hint, filled for the footer's own keys — the
-/// same two faces `KeyCapChip` wears in the host, restated here because chrome never crosses over.
+// MARK: - Action bar
+
+/// How a plugin surface draws its footer.
+public enum PluginFooter {
+    /// The shared ``ActionBar``, built from the scaffold's Back state, primary label and commands.
+    case standard
+    /// No footer at all.
+    case hidden
+    /// A bar the plugin draws itself — return any view, often an ``ActionBar`` with a custom model.
+    case custom(() -> AnyView)
+}
+
+/// The leading control of an ``ActionBar``.
+public enum ActionBarLeading {
+    /// A hamburger circle that opens a host-supplied menu (the palette's app menu, say).
+    case menu(() -> Void)
+    /// A back chevron labelled "Back esc" — a pushed view's way out.
+    case back(() -> Void)
+}
+
+/// One footer control: a label, its key-hint caps, its tint and what it runs.
+public struct ActionBarItem {
+    public var title: String
+    public var keys: [String]
+    public var tint: Color
+    public var action: () -> Void
+
+    public init(
+        title: String, keys: [String] = [], tint: Color = .secondary,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.keys = keys
+        self.tint = tint
+        self.action = action
+    }
+}
+
+/// What an ``ActionBar`` shows; every slot is optional.
+public struct ActionBarModel {
+    public var leading: ActionBarLeading?
+    public var primary: ActionBarItem?
+    public var actions: ActionBarItem?
+
+    public init(
+        leading: ActionBarLeading? = nil, primary: ActionBarItem? = nil,
+        actions: ActionBarItem? = nil
+    ) {
+        self.leading = leading
+        self.primary = primary
+        self.actions = actions
+    }
+}
+
+/// Visual tokens a host binds the bar to its own design system with; the defaults match the palette
+/// so a plugin gets the launcher's footer for free, and the app injects Theme-derived values so its
+/// own footer keeps tracking Theme and the UI-size setting.
+public struct ActionBarStyle {
+    public var barHeight: CGFloat
+    public var buttonHeight: CGFloat
+    public var menuButtonSize: CGFloat
+    public var horizontalInset: CGFloat
+    public var buttonPadding: CGFloat
+    public var groupSpacing: CGFloat
+    public var labelSpacing: CGFloat
+    public var font: Font
+    public var keyCapSize: CGFloat
+    public var keyCapFont: Font
+    public var hover: Color
+    /// Glass tint; nil derives white 0.05 (dark) / 0.25 (light) from the colour scheme.
+    public var frost: Color?
+
+    public init(
+        barHeight: CGFloat = 52, buttonHeight: CGFloat = 28, menuButtonSize: CGFloat = 36,
+        horizontalInset: CGFloat = 8, buttonPadding: CGFloat = 8, groupSpacing: CGFloat = 2,
+        labelSpacing: CGFloat = 6, font: Font = .callout.weight(.medium),
+        keyCapSize: CGFloat = 18, keyCapFont: Font = .system(size: 11, weight: .medium),
+        hover: Color = Color.primary.opacity(0.09), frost: Color? = nil
+    ) {
+        self.barHeight = barHeight
+        self.buttonHeight = buttonHeight
+        self.menuButtonSize = menuButtonSize
+        self.horizontalInset = horizontalInset
+        self.buttonPadding = buttonPadding
+        self.groupSpacing = groupSpacing
+        self.labelSpacing = labelSpacing
+        self.font = font
+        self.keyCapSize = keyCapSize
+        self.keyCapFont = keyCapFont
+        self.hover = hover
+        self.frost = frost
+    }
+}
+
+/// The palette's footer, shared by the launcher, extensions and native plugins: a leading control
+/// and a trailing frosted capsule holding a primary action and an Actions ⌘K toggle, floating over
+/// the surface. Real Liquid Glass, so it follows the app's transparency; every slot is optional.
+public struct ActionBar: View {
+    @Environment(\.colorScheme) private var colorScheme
+    private let model: ActionBarModel
+    private let style: ActionBarStyle
+
+    public init(_ model: ActionBarModel, style: ActionBarStyle = ActionBarStyle()) {
+        self.model = model
+        self.style = style
+    }
+
+    public var body: some View {
+        let frost = style.frost ?? Color.white.opacity(colorScheme == .dark ? 0.05 : 0.25)
+        return HStack(spacing: style.horizontalInset) {
+            leading(frost)
+            Spacer(minLength: 0)
+            trailing(frost)
+        }
+        .padding(.horizontal, style.horizontalInset)
+        .frame(height: style.barHeight)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func leading(_ frost: Color) -> some View {
+        switch model.leading {
+        case .menu(let action):
+            MenuCircle(size: style.menuButtonSize, hover: style.hover, action: action)
+                .frostedGlass(Circle(), frost: frost)
+        case .back(let action):
+            GlassBarButton(style: style, tint: .secondary, action: action) {
+                Image(systemName: "chevron.left").font(style.font.weight(.semibold))
+                Text("Back")
+                keyCap("esc")
+            }
+            .padding(4)
+            .frostedGlass(Capsule(), frost: frost)
+        case nil:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func trailing(_ frost: Color) -> some View {
+        if model.primary != nil || model.actions != nil {
+            HStack(spacing: style.groupSpacing) {
+                if let primary = model.primary { button(primary) }
+                if let actions = model.actions { button(actions) }
+            }
+            .padding(4)
+            .frostedGlass(Capsule(), frost: frost)
+        }
+    }
+
+    private func button(_ item: ActionBarItem) -> some View {
+        GlassBarButton(style: style, tint: item.tint, action: item.action) {
+            Text(item.title)
+            ForEach(Array(item.keys.enumerated()), id: \.offset) { _, key in keyCap(key) }
+        }
+    }
+
+    private func keyCap(_ text: String) -> some View {
+        KeyCap(text: text, outline: true, size: style.keyCapSize, font: style.keyCapFont)
+    }
+}
+
+/// The footer's menu circle; hover lives here, so a sweep never re-renders the bar around it.
+private struct MenuCircle: View {
+    let size: CGFloat
+    let hover: Color
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 3) {
+                Capsule().frame(width: 14, height: 1.5)
+                Capsule().frame(width: 8, height: 1.5)
+            }
+            .foregroundStyle(.secondary)
+            .frame(width: size, height: size)
+            .background(Circle().fill(hovered ? hover : Color.clear))
+            .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+    }
+}
+
+/// A footer control: bare until hover, then a faint capsule wash, sat inside a frosted capsule by
+/// its caller. Styled entirely by the injected ``ActionBarStyle`` so every surface reads the same.
+private struct GlassBarButton<Label: View>: View {
+    let style: ActionBarStyle
+    let tint: Color
+    let action: () -> Void
+    @ViewBuilder let label: () -> Label
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: style.labelSpacing) { label() }
+                .font(style.font)
+                .foregroundStyle(tint)
+                .padding(.horizontal, style.buttonPadding)
+                .frame(height: style.buttonHeight)
+                .contentShape(Capsule())
+                .background(Capsule().fill(hovered ? style.hover : Color.clear))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+    }
+}
+
+/// A keycap chip: `.outline` for a row's shortcut hint, filled for the footer's own keys — the same
+/// two faces `KeyCapChip` wears in the host, restated here because chrome never crosses over.
 private struct KeyCap: View {
     let text: String
     var outline: Bool = false
+    var size: CGFloat = 18
+    var font: Font = .system(size: 11, weight: .medium)
 
     var body: some View {
         Text(text)
-            .font(.system(size: 11, weight: .medium))
+            .font(font)
             .foregroundStyle(.secondary)
-            .frame(minWidth: 18, minHeight: 18)
+            .frame(minWidth: size, minHeight: size)
             .padding(.horizontal, 4)
             .background {
                 let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
@@ -670,39 +872,11 @@ private struct KeyCap: View {
     }
 }
 
-/// A footer control: bare until hover, then a faint capsule wash — the plugin's own `BarButton`,
-/// sat inside a frosted glass capsule by its caller. Metrics match the host's footer.
-private struct GlassBarButton<Label: View>: View {
-    let action: () -> Void
-    @ViewBuilder let label: () -> Label
-    @State private var hovered = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) { label() }
-                .font(.callout.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .frame(height: 28)
-                .contentShape(Capsule())
-                .background(Capsule().fill(hovered ? Color.primary.opacity(0.09) : Color.clear))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
-    }
-}
-
-/// The palette's `frosted(in:)` restated: real Liquid Glass tinted like the host's controls, so a
-/// footer capsule reads the same and follows the app's background-transparency setting.
-private struct FrostedCapsule: ViewModifier {
-    let scheme: ColorScheme
-
-    func body(content: Content) -> some View {
-        let frost = Color.white.opacity(scheme == .dark ? 0.05 : 0.25)
-        return content
-            .padding(4)
-            .glassEffect(.regular.interactive().tint(frost), in: Capsule())
-            .tint(.clear)
+private extension View {
+    /// The palette's `frosted(in:)` restated: real Liquid Glass tinted so a control reads brighter
+    /// than clear glass and follows the app's background-transparency setting.
+    func frostedGlass(_ shape: some Shape, frost: Color) -> some View {
+        glassEffect(.regular.interactive().tint(frost), in: shape).tint(.clear)
     }
 }
 
