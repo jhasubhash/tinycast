@@ -1,4 +1,5 @@
 import AppKit
+import TinycastPluginKit
 
 /// How a native plugin meets the palette: enabling it, launching one, and stepping back out.
 /// The manager owns state; this owns the window moves, so the manager never touches a surface.
@@ -88,7 +89,7 @@ final class PluginCoordinator {
         runPlugin(install)
     }
 
-    private func runPlugin(_ install: PluginInstall) {
+    private func runPlugin(_ install: PluginInstall, route: [String: String]? = nil) {
         let environment = PluginEnvironment(
             frontmostAppBundleID: paletteCoordinator.targetApp?.bundleIdentifier)
         // Switch the palette over first, so the loading state is what the user sees.
@@ -97,7 +98,30 @@ final class PluginCoordinator {
         if !paletteCoordinator.isVisible {
             paletteCoordinator.showPalette(mode: .plugin)
         }
-        plugins.launch(install, environment: environment)
+        plugins.launch(install, environment: environment, route: route)
+    }
+
+    /// Open a plugin straight to a saved deep link — a `tinycast://plugin/…` quicklink resolved here.
+    func launchRoute(identifier: String, payload: [String: String]) {
+        guard settings.pluginsEnabled, let install = plugins.install(forIdentifier: identifier)
+        else { return }
+        runPlugin(install, route: payload)
+    }
+
+    /// The scaffold's "Add to Main Menu" command: pin the running plugin's current view as a Quicklink.
+    func pinRoute(_ route: PluginRoute) {
+        guard let identifier = plugins.runningIdentifier else { return }
+        let link = PluginRouteURL.encode(identifier: identifier, payload: route.payload)
+        let iconSymbol: String? = {
+            if case .symbol(let name) = route.icon { return name } else { return nil }
+        }()
+        do {
+            _ = try core.quicklinks.add(
+                Quicklink(name: route.title, link: link, iconSymbol: iconSymbol))
+            core.showMessage("Added “\(route.title)” to the launcher")
+        } catch {
+            core.showMessage("Couldn't add to the launcher", tone: .danger)
+        }
     }
 
     /// Escape past an empty search field: pop the plugin's own stack, then leave the plugin.
@@ -139,5 +163,36 @@ final class PluginCoordinator {
         core.favorites.remove(keys: Set(entryIDs))
         core.visibility.removeItemKeys(Set(entryIDs))
         core.aliases.removeKeys(Set(entryIDs))
+    }
+}
+
+/// Encodes a plugin deep link as a `tinycast://plugin/<identifier>?<payload>` URL — stored as an
+/// ordinary Quicklink, intercepted at open time and dispatched to the plugin, not the browser.
+enum PluginRouteURL {
+    private static let scheme = "tinycast"
+    private static let host = "plugin"
+
+    static func encode(identifier: String, payload: [String: String]) -> String {
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = host
+        components.path = "/" + identifier
+        if !payload.isEmpty {
+            components.queryItems = payload.sorted { $0.key < $1.key }
+                .map { URLQueryItem(name: $0.key, value: $0.value) }
+        }
+        return components.string ?? "\(scheme)://\(host)/\(identifier)"
+    }
+
+    static func decode(_ link: String) -> (identifier: String, payload: [String: String])? {
+        guard let components = URLComponents(string: link),
+            components.scheme == scheme, components.host == host
+        else { return nil }
+        let identifier =
+            components.path.hasPrefix("/") ? String(components.path.dropFirst()) : components.path
+        guard !identifier.isEmpty else { return nil }
+        var payload: [String: String] = [:]
+        for item in components.queryItems ?? [] { payload[item.name] = item.value ?? "" }
+        return (identifier, payload)
     }
 }

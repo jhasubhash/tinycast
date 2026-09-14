@@ -146,6 +146,11 @@ final class QuicklinkCoordinator {
     private func performQuicklinkOpen(
         _ quicklink: Quicklink, link: String, forcingDefaultApp: Bool
     ) {
+        // A saved plugin deep link opens the plugin in place, never the browser.
+        if let route = PluginRouteURL.decode(link) {
+            core.pluginCoordinator.launchRoute(identifier: route.identifier, payload: route.payload)
+            return
+        }
         if windowController.isVisible { paletteCoordinator.hidePalette(restoreFocus: false) }
         let openWith = forcingDefaultApp ? nil : quicklink.openWithBundleID
         Task {
