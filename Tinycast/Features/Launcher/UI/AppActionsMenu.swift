@@ -139,6 +139,17 @@ enum AppActionsMenu {
                     core.extensionCoordinator.confirmUninstall(app)
                 })
         }
+        if app.kind == .quicklink, let id = Quicklink.id(fromEntryID: app.id),
+            let quicklink = core.quicklinks.quicklink(id: id)
+        {
+            items.append(
+                PopoverMenuItem(
+                    title: "Edit Quicklink", systemImage: "pencil", startsSection: true
+                ) {
+                    core.paletteCoordinator.hidePalette(restoreFocus: false)
+                    core.quicklinkCoordinator.editQuicklink(quicklink)
+                })
+        }
         return PopoverMenuContent(header: app.name, items: items)
     }
 }
