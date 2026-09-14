@@ -55,6 +55,7 @@ system-wide chord, and HIToolbox's TIS APIs remain the public input-source mecha
 | change how anything is wired or owned | [architecture.md](docs/architecture.md) |
 | write Swift — naming, style, concurrency, budgets, comments | [standards.md](docs/standards.md) |
 | claim a change is done | [testing.md](docs/testing.md) |
+| claim a **UI** change is done — a screen, plugin or extension | [UI_TESTS.md](UI_TESTS.md) |
 | build, run or regenerate data | [development.md](docs/development.md) |
 | add or restyle any view | [ui.md](docs/ui.md) |
 | touch one feature's internals | [features/](docs/features/) — each opens with its invariants |
@@ -135,4 +136,6 @@ Each item is explained in [testing.md](docs/testing.md#definition-of-done).
 - The Debug build compiles with **no new warnings**.
 - `./Scripts/lint.sh` is clean.
 - `grep -rln 'import AppKit\|import SwiftUI\|import Cocoa' Tinycast/Features/*/Model/` returns nothing.
+- A UI change was driven and captured per [UI_TESTS.md](UI_TESTS.md), and any new failure mode is in
+  its register.
 - Any doc your change made wrong is fixed in the same commit.
