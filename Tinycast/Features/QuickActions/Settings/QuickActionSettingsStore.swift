@@ -27,6 +27,8 @@ final class QuickActionSettingsStore {
             as? [String: Bool] ?? [:]
         loaded.targetLanguage =
             defaults.string(forKey: AppSettingsKey.quickActionLanguage.rawValue) ?? ""
+        loaded.translateWithAI =
+            defaults.bool(forKey: AppSettingsKey.quickActionTranslateWithAI.rawValue)
         loaded.storedInstructionOverrides =
             defaults.dictionary(forKey: AppSettingsKey.quickActionInstructions.rawValue)
             as? [String: String] ?? [:]
@@ -119,6 +121,9 @@ final class QuickActionSettingsStore {
         defaults.set(
             settings.storedPreviewChoices, forKey: AppSettingsKey.quickActionPreviews.rawValue)
         defaults.set(settings.targetLanguage, forKey: AppSettingsKey.quickActionLanguage.rawValue)
+        defaults.set(
+            settings.translateWithAI,
+            forKey: AppSettingsKey.quickActionTranslateWithAI.rawValue)
         defaults.set(
             settings.storedInstructionOverrides,
             forKey: AppSettingsKey.quickActionInstructions.rawValue)

@@ -171,7 +171,7 @@ struct QuickActionsSettingsView: View {
                 select: store.select,
                 modelLabel: {
                     SettingsRowTitle(.quickActionsModel, "Model")
-                    Text("Used by every action without a model of its own, except Translate.")
+                    Text("Used by every action without a model of its own, and by Translate when \u{201C}Translate with AI\u{201D} is on.")
                 },
                 effortLabel: {
                     SettingsRowTitle(.quickActionsModel, "Reasoning effort")
@@ -201,12 +201,20 @@ struct QuickActionsSettingsView: View {
                 SettingsRowTitle(.quickActionsTranslate, "Translate to")
                 Text("The panel can still translate into another language once it is open.")
             }
+            Toggle(isOn: translateWithAIBinding) {
+                SettingsRowTitle(.quickActionsTranslate, "Translate with AI")
+                Text("Uses the model above instead of Apple's translator, and reads romanized text "
+                    + "like \u{201C}kya ho raha hai\u{201D}.")
+            }
         } header: {
             SettingsSectionHeader(.quickActionsTranslate)
         } footer: {
             Text(
-                "Translation uses Apple's own translator on this Mac, so it costs nothing and "
-                    + "reaches no provider. A language downloads the first time you use it."
+                translateWithAIBinding.wrappedValue
+                    ? "Translation is sent to the model chosen above, so it can read transliterated "
+                        + "text Apple's on-device translator cannot."
+                    : "Translation uses Apple's own translator on this Mac, so it costs nothing and "
+                        + "reaches no provider. A language downloads the first time you use it."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -255,6 +263,12 @@ struct QuickActionsSettingsView: View {
         Binding(
             get: { store.settings.targetLanguage },
             set: { store.settings.targetLanguage = $0 })
+    }
+
+    private var translateWithAIBinding: Binding<Bool> {
+        Binding(
+            get: { store.settings.translateWithAI },
+            set: { store.settings.translateWithAI = $0 })
     }
 
     private var modelChoices: [AIModelOption] {

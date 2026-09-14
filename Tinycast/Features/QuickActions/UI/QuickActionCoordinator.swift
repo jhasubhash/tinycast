@@ -257,7 +257,17 @@ final class QuickActionCoordinator {
         _ state: QuickActionPanelState, streaming: Bool
     ) async throws -> String {
         if state.action.usesTranslationFramework {
-            return try await TextTranslator.translate(state.original, to: state.targetLanguage)
+            guard store.settings.translateWithAI else {
+                return try await TextTranslator.translate(state.original, to: state.targetLanguage)
+            }
+            return try await QuickActionRunner.translate(
+                state.original,
+                to: TextTranslator.displayName(of: state.targetLanguage),
+                using: core.quickActionProvider(for: state.action),
+                onDelta: { delta in
+                    guard streaming else { return }
+                    state.append(delta)
+                })
         }
         let provider = try core.quickActionProvider(for: state.action)
         return try await QuickActionRunner.run(
