@@ -214,7 +214,7 @@ struct QuickActionsSettingsView: View {
             Toggle(isOn: translateWithAIBinding) {
                 SettingsRowTitle(.quickActionsTranslate, "Translate with AI")
                 Text("Uses the model above instead of Apple's translator, and reads romanized text "
-                    + "like \u{201C}kya ho raha hai\u{201D}.")
+                    + "typed in the Latin alphabet.")
             }
         } header: {
             SettingsSectionHeader(.quickActionsTranslate)
@@ -256,8 +256,8 @@ struct QuickActionsSettingsView: View {
     private var translateFooter: String {
         if store.settings.autoLanguageSwap {
             return "Translate reads the selection and picks the direction: text in the primary "
-                + "language becomes the secondary, and anything else becomes the primary. Romanized "
-                + "text like \u{201C}kya ho raha hai\u{201D} needs Translate with AI."
+                + "language becomes the secondary, and anything else becomes the primary. Text typed "
+                + "in another language's words needs Translate with AI."
         }
         return store.settings.translateWithAI
             ? "Translation is sent to the model chosen above, so it can read transliterated text "
