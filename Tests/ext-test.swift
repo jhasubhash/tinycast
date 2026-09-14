@@ -1412,7 +1412,13 @@ struct ExtensionTests {
         await runtime.start(
             session: "sSwift", code: command, file: URL(fileURLWithPath: "/tmp/swift-helper.js"),
             mode: .view, context: launchContext())
-        await settle(1200)
+        // The spawn+exec can outlast a fixed wait when the machine is busy (a full parallel suite),
+        // so poll until the child's result lands rather than sleeping a guessed interval.
+        for _ in 0..<60 {
+            let markdown = recorder.trees.last?.activeRoot?.string("markdown")
+            if let markdown, markdown != "pending" { break }
+            await settle(100)
+        }
 
         let mode = (try? FileManager.default.attributesOfItem(atPath: helper.path))
             .flatMap { $0[.posixPermissions] as? NSNumber }

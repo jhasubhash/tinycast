@@ -82,8 +82,8 @@ typealias MenuPanelClipPath =
                 AnyView(
                     PopoverMenu(
                         header: popover.header, items: items, selection: selection,
-                        width: width, onActivate: onActivate, query: query,
-                        attachment: corner.popoverAttachment))
+                        width: width, onActivate: onActivate,
+                        attachment: corner.popoverAttachment, query: query))
             },
             activate: { popover.items[matches[$0]].action() },
             isLoading: { popover.items[matches[$0]].isLoading },
