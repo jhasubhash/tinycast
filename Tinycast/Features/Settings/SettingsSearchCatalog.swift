@@ -112,7 +112,7 @@ enum SettingsSearchCatalog {
         + systemActions + commands + quicklinks + appleShortcuts + fallbacks + ai + quickActions + fileSearch
         + notes
         + snippets + navigation + windowManagement + clipboard + emoji + calendar
-        + extensions + permissions + backup + about
+        + extensions + plugins + permissions + backup + about
 
     private static let general: [SettingsSearchEntry] = [
         .init(pane: .general, keywords: ["preferences", "settings"]),
@@ -533,6 +533,12 @@ enum SettingsSearchCatalog {
         .init(
             .extensionsStorage, "Leftover files",
             keywords: ["clean up", "disk", "reclaim", "cache"])
+    ]
+
+    private static let plugins: [SettingsSearchEntry] = [
+        .init(
+            pane: .plugins,
+            keywords: ["native", "swift", "dylib", "compiled", "plugin"])
     ]
 
     private static let permissions: [SettingsSearchEntry] = [

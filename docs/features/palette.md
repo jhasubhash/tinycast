@@ -427,7 +427,8 @@ long it grows. `MenuPanel.canBecomeKey` is `false` so the palette keeps key stat
 hover arming — rows light on real pointer movement, never on a scroll under a still cursor.
 
 The panel is a second SwiftUI hierarchy, so it observes nothing of `RootPaletteView`'s `@State`:
-`syncMenuPanel` pushes a rebuilt tree on every `openMenu` or `menuSelection` change, and
+`syncMenuPanel` pushes a rebuilt tree on every `openMenu`, `menuSelection` or `menuFilterQuery`
+change, and
 `paletteEnvironment` injects the same stores into both hierarchies so they cannot drift.
 `WindowReader` reports the palette's `NSWindow`, which the menu's frame is placed against.
 
@@ -439,17 +440,23 @@ the shadow after layout and display. Native `PopoverMenu` content reads its moti
 changes cannot silently alter an extension surface. Each extension menu also supplies its own clip
 path; the controller applies it as an opaque value and never reconstructs extension geometry.
 
-## Menu-open input freeze
+## Menu-open input drives the filter
 
-While a popover menu (⌘K Actions / app menu / clipboard type filter) is open the search field reads as inert but
-**never resigns first responder** — resigning makes the `NSTextField` swap between its field-editor
-and cell rendering, shifting the text / placeholder a point or two, so focus stays put. Input is
-frozen instead:
+While a popover menu (⌘K Actions / app menu / clipboard type filter) is open the search field reads as
+inert but **never resigns first responder** — resigning makes the `NSTextField` swap between its
+field-editor and cell rendering, shifting the text / placeholder a point or two, so focus stays put.
+Typing filters the open menu instead:
 
 - `RootPaletteView` mirrors the open state into `PaletteState.menuOpen`, whose `didSet` fires
-  `onMenuOpenChanged`.
-- `PalettePanel.sendEvent` then swallows text-editing keystrokes while `menuOpen` (letting ⌘/⌃ chords
-  and menu-nav keys through to SwiftUI `onKeyPress`), which is how ⌘. and ⌃X still reach their rows.
+  `onMenuOpenChanged`, and clears `PaletteState.menuFilterQuery` on every open so a menu starts wide.
+- `PalettePanel.sendEvent` routes printable text and Backspace to `onMenuFilterKey` while `menuOpen`
+  — it edits `menuFilterQuery` — and lets ⌘/⌃ chords and the menu-nav keys (arrows, ↵, ⇥, Esc)
+  through to SwiftUI `onKeyPress`, which is how ⌘. and ⌃X still reach their rows.
+- `menuContent` threads `menuFilterQuery` into every menu it builds. `PaletteMenuContent` filters the
+  rows by a case-insensitive `PopoverMenuItem.matches`, so its row count, activation and rendering all
+  address the same visible subset; `PopoverMenu` (native) and `ExtensionActionsPanel` (the extensions'
+  own copy, per the Extensions invariant) each reveal a search field once the query is non-empty and
+  show "No matching actions" when nothing matches.
 - The caret is hidden by clearing SwiftUI's **own** live field editor's `insertionPointColor`. SwiftUI
   force-casts its field editor to a private subclass, so vending a custom one crashes — only the
   existing one can be tuned.
@@ -559,3 +566,15 @@ The same show also mirrors that app into `PaletteState.pasteTarget` (a `PasteTar
 name + bundle path), so Clipboard and Emoji can name it — the footer pill reads "Paste to Notes" and
 the ⌘K paste rows carry the app's icon. Resolved once per summon, never per render, and deliberately
 not cleared by `prepare` (pop-to-root resets the screen, not the target).
+
+## The footer is the shared `ActionBar`
+
+`RootPaletteView.bottomBar` doesn't draw its own controls: it builds an `ActionBarModel` (the app
+menu as the leading hamburger, the primary action, the Actions ⌘K toggle) and renders
+`ActionBar` from `TinycastPluginKit` with an `actionBarStyle` derived from `Theme` and the current
+`InterfaceMetrics`. That is the *same* bar the native plugins' `PluginScaffold` draws and the same one
+an extension command rides (its list renders into the palette, so it gets `bottomBar` around it), so
+all three surfaces share one implementation. The tokens stay in `Theme` — they're passed in as the
+style, not baked into the SDK — so the launcher footer still follows Theme and the UI-size setting,
+while a plugin that supplies no style gets matching defaults. The bar lives in the SDK because it's
+the one module both the app and third-party plugin dylibs link; that makes `ActionBar` public API.

@@ -49,6 +49,7 @@ final class AppCore {
     let customCommandArguments = CustomCommandArgumentSession()
     let notesStore: NotesStore
     let extensions: ExtensionManager
+    let plugins = PluginManager()
     let chatHistory: ChatHistoryStore
     let aiChat: AIChatState
     let aiSettings = AISettingsStore(
@@ -99,6 +100,9 @@ final class AppCore {
     @ObservationIgnored private(set) lazy var extensionCoordinator = ExtensionCoordinator(
         extensions: extensions, palette: palette, paletteCoordinator: paletteCoordinator,
         settingsCoordinator: settingsCoordinator, settings: settings, core: self)
+    @ObservationIgnored private(set) lazy var pluginCoordinator = PluginCoordinator(
+        plugins: plugins, palette: palette, paletteCoordinator: paletteCoordinator,
+        settingsCoordinator: settingsCoordinator, settings: settings, core: self)
     @ObservationIgnored private(set) lazy var windowCommandCoordinator = WindowCommandCoordinator(
         settings: settings, paletteCoordinator: paletteCoordinator, windowMover: windowMover,
         spaceSwitcher: spaceSwitcher)
@@ -136,6 +140,7 @@ final class AppCore {
         menuSearchCoordinator: menuSearchCoordinator,
         windowSwitchCoordinator: windowSwitchCoordinator,
         notesCoordinator: notesCoordinator, extensionCoordinator: extensionCoordinator,
+        pluginCoordinator: pluginCoordinator,
         calendarCoordinator: calendarCoordinator,
         core: self)
     @ObservationIgnored private(set) lazy var fallbackCoordinator = FallbackCoordinator(
@@ -226,6 +231,8 @@ final class AppCore {
             clipboardCoordinator.applyEnabled()
             extensions.start(appIndex: appIndex, coordinator: extensionCoordinator)
             extensionCoordinator.applyEnabled()
+            plugins.start(appIndex: appIndex)
+            pluginCoordinator.applyEnabled()
             fileSearchCoordinator.applyEnabled()
             windowSwitchCoordinator.applyEnabled()
             menuSearchCoordinator.applyEnabled()
@@ -300,8 +307,14 @@ final class AppCore {
             hotKeys.onRunExtensionCommand = { [weak self] entryID in
                 self?.extensionCoordinator.runExtensionCommand(entryID: entryID)
             }
+            hotKeys.onRunPluginCommand = { [weak self] entryID in
+                self?.pluginCoordinator.runPluginCommand(entryID: entryID)
+            }
             extensions.onDidUninstall = { [weak self] entryIDs in
                 self?.extensionCoordinator.removeExtensionReferences(entryIDs: entryIDs)
+            }
+            plugins.onDidUninstall = { [weak self] entryIDs in
+                self?.pluginCoordinator.removePluginReferences(entryIDs: entryIDs)
             }
             hotKeys.displayName = { [weak self] action in self?.hotKeyDisplayName(for: action) }
             hotKeys.allowsAction = { [weak self] action in
@@ -397,6 +410,8 @@ final class AppCore {
             return appleShortcutCoordinator.name(of: id)
         case .extensionCommand(let entryID):
             return appIndex.apps.first { $0.kind == .extensionCommand && $0.id == entryID }?.name
+        case .pluginCommand(let entryID):
+            return appIndex.apps.first { $0.kind == .plugin && $0.id == entryID }?.name
         case .togglePalette, .command, .systemAction, .windowCommand:
             return nil
         }

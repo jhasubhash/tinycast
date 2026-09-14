@@ -171,6 +171,15 @@ The fast way to test one, from this repo's root:
 "$TMPDIR/tinycast-harness/ext-test" ~/Developer/tinycast_addons/extensions/<name> <command>
 ```
 
+### Native plugins are compiled, not bundled JavaScript
+
+Native Swift plugins (see [docs/features/plugins.md](docs/features/plugins.md)) also live under
+`~/Developer/tinycast_addons/extensions/` — `hello-plugin` is the reference — but each is Swift
+source built to a `.dylib` with `swiftc`, not an esbuild bundle. They link the app's embedded
+`TinycastPluginKit.framework` and install to `~/Library/Application Support/<bundle id>/plugins/<name>/`.
+Unlike a JS extension, native plugin support *required* host changes — a loader, a launcher `Kind`,
+and palette hosting — which is the register row below.
+
 ## Rules for a custom change
 
 1. **Commit on `custom`, never `main`.**
@@ -197,3 +206,4 @@ link are the fork's own scaffolding and are not listed. `git log main..custom` i
 | Change | Files | Why | Upstreamable |
 | --- | --- | --- | --- |
 | Inline alias & shortcut editing on the ⌘K action-panel rows | `Features/Launcher/UI/{AppActionsMenu,LauncherCoordinator,InlineEntryEditor}.swift`, `Features/Launcher/Service/AppIndex.swift`, `Features/HotKeys/UI/ShortcutRecorder.swift`, `Palette/{PaletteState,PaletteScreen,RootPaletteView,PalettePanel,PaletteWindowController}.swift`, `DesignSystem/PopoverMenu.swift` | Raycast-parity: ⌘K → Change Alias / Change Shortcut edit in a box on the row itself (menu stays open; alias reads faded until edited and commits on ↵; shortcut shows "Listening…", assigns on capture, flags a taken chord inline). Extension commands gained a `hotKeyAction` so they're bindable too. `ShortcutRecorder` gained `recordingAccent`/`showsConflictInline`. | Yes |
+| Native Swift/SwiftUI plugin system | `TinycastPluginKit/`, `Features/Plugins/**`, `App/AppCore.swift`, `Palette/{PaletteMode,PaletteEscapeAction,RootPaletteView}.swift`, `Features/Launcher/{Service/AppIndex,Service/VisibilityStore,UI/LauncherList,UI/LauncherCoordinator}.swift`, `Features/HotKeys/{Model/HotKeyAction,Service/HotKeyManager}.swift`, `Features/Settings/{SettingsTab,SettingsDetailView,AppSettings,AppSettingsKey,SettingsSearchCatalog}.swift`, `Features/Backup/Model/SettingsBackupCoverage.swift`, `project.yml`, `Tinycast.entitlements` | Compiled Swift plugins that `dlopen` into the palette and render SwiftUI, like BetterTouchTool's Swift plugins; complements the JS extension system. A plugin links the embedded `TinycastPluginKit.framework` for one shared type identity across the load boundary. | Maybe — needs the `disable-library-validation` entitlement, which upstream may decline. |

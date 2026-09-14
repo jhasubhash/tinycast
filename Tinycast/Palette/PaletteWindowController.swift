@@ -314,11 +314,39 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         panel.onFieldEditorFocused = { [weak self] context in
             self?.core.inputSourceSwitcher.applySession(to: context)
         }
+        // A menu filters as you type: printable text and backspace edit its query, while the arrows,
+        // Return, Tab and Escape fall through to the menu's own key handlers.
+        panel.onMenuFilterKey = { [weak self] event in
+            guard let core = self?.core, core.palette.menuOpen else { return false }
+            guard event.modifierFlags.isDisjoint(with: [.command, .option, .control]) else {
+                return false
+            }
+            if Int(event.keyCode) == kVK_Delete {
+                guard !core.palette.menuFilterQuery.isEmpty else { return false }
+                core.palette.menuFilterQuery.removeLast()
+                return true
+            }
+            guard let text = event.characters, text.count == 1,
+                let scalar = text.unicodeScalars.first,
+                scalar.value >= 0x20, scalar.value != 0x7F, scalar.value < 0xF700
+            else { return false }
+            core.palette.menuFilterQuery.append(text)
+            return true
+        }
         // Backspace takes Escape's back step but never closes: a root screen falls to the launcher.
         panel.onBareBackspace = { [weak self] in
             guard let core = self?.core, core.palette.query.isEmpty else { return false }
             // A form field owns the key: the text it deletes is the field's, not a query's.
             if core.palette.isEditingField { return false }
+            // A plugin surface owns the whole panel and its own keyboard, search field included;
+            // the host cannot see whether that field still holds text, so the key is the
+            // surface's to consume. Escape is a surface's documented way back out.
+            if core.palette.mode == .plugin, core.plugins.surface != nil { return false }
+            // A plugin's list levels step back one at a time, like an extension's screens do.
+            if core.palette.mode == .plugin, core.pluginCoordinator.canGoBack {
+                core.pluginCoordinator.exitPluginScreen()
+                return true
+            }
             // The argument form steps back through the answers first, one key per field.
             if core.palette.mode == .customCommandArguments,
                 let previous = core.customCommandArguments.retreat()

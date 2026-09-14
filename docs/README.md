@@ -46,6 +46,7 @@ open with an `## Invariants` section; read it before changing anything in that a
 [backup](features/backup.md) ·
 [Raycast import](features/raycast-import.md) ·
 [Raycast extensions](features/extensions.md) ·
+[native plugins](features/plugins.md) ·
 [updates](features/updates.md) ·
 [support](features/support.md)
 

@@ -18,6 +18,8 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     case customCommandArguments
     /// A Raycast extension command rendering into the palette.
     case extensionCommand
+    /// A native Swift plugin rendering into the palette.
+    case plugin
 
     var id: String { rawValue }
 
@@ -40,6 +42,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .customCommandArguments: return CustomCommand.sfSymbol
         case .snippets: return "curlybraces"
         case .extensionCommand: return "puzzlepiece.extension"
+        case .plugin: return "puzzlepiece.extension.fill"
         }
     }
     var placeholder: String {
@@ -61,6 +64,8 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .customCommandArguments: return "Enter a value…"
         // Replaced by the command's own `searchBarPlaceholder` whenever it declares one.
         case .extensionCommand: return "Search…"
+        // Replaced by the plugin's own metadata name where it lists rows.
+        case .plugin: return "Search…"
         }
     }
 }

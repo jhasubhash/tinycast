@@ -78,6 +78,12 @@ enum SettingsBackupCoverage {
             + "something else there.",
         AppSettingsKey.extensionsEnabled.rawValue:
             "Doubles as consent to run third-party JavaScript; an import must not switch it on.",
+        AppSettingsKey.pluginsEnabled.rawValue:
+            "Doubles as consent to load native code that runs in-process with full privileges; an "
+            + "import must not switch it on.",
+        AppSettingsKey.pluginsShowInLauncher.rawValue:
+            "Governs rows for plugins installed on this Mac, which no other Mac has; a backup would "
+            + "list commands that aren't there.",
         AppSettingsKey.palettePosition.rawValue:
             "Machine-local geometry: every entry names a display this Mac has, and no other one.",
         AppSettingsKey.autoSwitchInputSource.rawValue:

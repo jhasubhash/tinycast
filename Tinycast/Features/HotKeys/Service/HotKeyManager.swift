@@ -15,6 +15,7 @@ final class HotKeyManager {
     var onRunQuickAction: ((UUID) -> Void)?
     var onRunAppleShortcut: ((UUID) -> Void)?
     var onRunExtensionCommand: ((String) -> Void)?
+    var onRunPluginCommand: ((String) -> Void)?
     /// Names what only the stores know; the fixed catalogs resolve here. Set in `AppCore.start()`.
     var displayName: ((HotKeyAction) -> String?)?
     /// Whether the action's launcher category is switched on. Set in `AppCore.start()`.
@@ -55,6 +56,7 @@ final class HotKeyManager {
     private let boundWindowLayoutKey = "boundWindowLayoutIDs"
     private let boundAppleShortcutKey = "boundAppleShortcutIDs"
     private let boundExtensionCommandKey = "boundExtensionCommandEntryIDs"
+    private let boundPluginCommandKey = "boundPluginCommandEntryIDs"
 
     func start(
         customCommandIDs: Set<UUID>, quicklinkIDs: Set<UUID>, windowLayoutIDs: Set<UUID>,
@@ -81,6 +83,12 @@ final class HotKeyManager {
     /// Never pruned at launch: not-installed-yet and gone are indistinguishable there.
     var boundExtensionCommandEntryIDs: [String] {
         UserDefaults.standard.stringArray(forKey: boundExtensionCommandKey) ?? []
+    }
+
+    /// Never pruned at launch, for the same reason as extension commands: not-yet-installed reads
+    /// the same as gone.
+    var boundPluginCommandEntryIDs: [String] {
+        UserDefaults.standard.stringArray(forKey: boundPluginCommandKey) ?? []
     }
 
     /// Bundle IDs holding a per-app hotkey, so `start()` knows which records to load.
@@ -158,6 +166,10 @@ final class HotKeyManager {
             var set = Set(boundExtensionCommandEntryIDs)
             if binding == nil { set.remove(entryID) } else { set.insert(entryID) }
             UserDefaults.standard.set(Array(set), forKey: boundExtensionCommandKey)
+        case .pluginCommand(let entryID):
+            var set = Set(boundPluginCommandEntryIDs)
+            if binding == nil { set.remove(entryID) } else { set.insert(entryID) }
+            UserDefaults.standard.set(Array(set), forKey: boundPluginCommandKey)
         case .togglePalette, .command, .systemAction, .windowCommand:
             break
         }
@@ -202,6 +214,7 @@ final class HotKeyManager {
         actions += boundWindowLayoutIDs.map { .windowLayout(id: $0) }
         actions += boundAppleShortcutIDs.map { .appleShortcut(id: $0) }
         actions += boundExtensionCommandEntryIDs.map { .extensionCommand(entryID: $0) }
+        actions += boundPluginCommandEntryIDs.map { .pluginCommand(entryID: $0) }
         actions += SystemAction.ID.allCases.map { .systemAction(id: $0) }
         actions += WindowCommand.ID.allCases.map { .windowCommand(id: $0) }
         candidateActionsCache = actions
@@ -232,6 +245,8 @@ final class HotKeyManager {
             return displayName?(action) ?? "Apple Shortcut"
         case .extensionCommand:
             return displayName?(action) ?? "Extension Command"
+        case .pluginCommand:
+            return displayName?(action) ?? "Plugin Command"
         }
     }
 
@@ -269,6 +284,7 @@ final class HotKeyManager {
         case .quickAction(let id): onRunQuickAction?(id)
         case .appleShortcut(let id): onRunAppleShortcut?(id)
         case .extensionCommand(let entryID): onRunExtensionCommand?(entryID)
+        case .pluginCommand(let entryID): onRunPluginCommand?(entryID)
         }
     }
 

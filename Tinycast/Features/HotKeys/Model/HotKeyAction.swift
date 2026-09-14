@@ -17,6 +17,8 @@ enum HotKeyAction: Hashable, Sendable {
     case appleShortcut(id: UUID)
     /// Keyed by `AppEntry.id`, which is what survives a reinstall of the extension.
     case extensionCommand(entryID: String)
+    /// Keyed by `AppEntry.id`, which survives a reinstall of the plugin.
+    case pluginCommand(entryID: String)
 
     /// The UserDefaults key, and the `HotKeyCenter` registration id: one per action.
     var defaultsKey: String {
@@ -33,6 +35,7 @@ enum HotKeyAction: Hashable, Sendable {
         case .quickAction(let id): "hotkey.quickAction." + id.uuidString.lowercased()
         case .appleShortcut(let id): "hotkey.appleShortcut." + id.uuidString.lowercased()
         case .extensionCommand(let entryID): "hotkey.extensionCommand." + entryID
+        case .pluginCommand(let entryID): "hotkey.pluginCommand." + entryID
         }
     }
 

@@ -68,19 +68,25 @@ typealias MenuPanelClipPath =
 
     init(
         popover: PopoverMenuContent, selection: Binding<Int>, width: CGFloat? = nil,
-        onActivate: @escaping (Int) -> Void
+        query: String = "", onActivate: @escaping (Int) -> Void
     ) {
+        // Filter here so row count, activation and rendering all address the same visible subset.
+        let matches: [Int] =
+            query.trimmingCharacters(in: .whitespaces).isEmpty
+            ? Array(popover.items.indices)
+            : popover.items.indices.filter { popover.items[$0].matches(query) }
+        let items = matches.map { popover.items[$0] }
         self.init(
-            rowCount: popover.items.count,
+            rowCount: items.count,
             view: { corner in
                 AnyView(
                     PopoverMenu(
-                        header: popover.header, items: popover.items, selection: selection,
+                        header: popover.header, items: items, selection: selection,
                         width: width, onActivate: onActivate,
-                        attachment: corner.popoverAttachment))
+                        attachment: corner.popoverAttachment, query: query))
             },
-            activate: { popover.items[$0].action() },
-            isSelectable: { popover.items[$0].isSelectable },
+            activate: { popover.items[matches[$0]].action() },
+            isSelectable: { popover.items[matches[$0]].isSelectable },
             clipPath: { bounds, metrics, corner in
                 PopoverMenu.SurfaceShape(
                     attachment: corner.popoverAttachment, radius: metrics.radius.menuPanel,
@@ -88,7 +94,7 @@ typealias MenuPanelClipPath =
                 ).path(in: bounds).cgPath
             },
             motion: .palette,
-            keepsOpen: { popover.items[$0].keepsMenuOpen })
+            keepsOpen: { popover.items[matches[$0]].keepsMenuOpen })
     }
 }
 
@@ -97,7 +103,7 @@ private extension MenuPanelCorner {
         switch self {
         case .bottomLeading: .bottomLeading
         case .bottomTrailing: .bottomTrailing
-        case .belowHeaderTrailing: .none
+        case .belowHeaderTrailing, .aboveHeaderTrailing: .none
         }
     }
 }
@@ -125,7 +131,8 @@ private extension MenuPanelCorner {
     func actions(at selection: Int) -> PopoverMenuContent?
     /// Defaults to wrapping `actions(at:)`, so a screen implements one or the other.
     func menuContent(
-        at selection: Int, menuSelection: Binding<Int>, onActivate: @escaping (Int) -> Void
+        at selection: Int, menuSelection: Binding<Int>, query: String,
+        onActivate: @escaping (Int) -> Void
     ) -> PaletteMenuContent?
     func activate(at selection: Int)
     /// ⌘↵. False when the selection has no secondary action, leaving the key unhandled.
@@ -153,11 +160,12 @@ extension PaletteScreen {
     func tabTarget(from selection: Int, backwards: Bool) -> Int? { nil }
     func actions(at selection: Int) -> PopoverMenuContent? { nil }
     func menuContent(
-        at selection: Int, menuSelection: Binding<Int>, onActivate: @escaping (Int) -> Void
+        at selection: Int, menuSelection: Binding<Int>, query: String,
+        onActivate: @escaping (Int) -> Void
     ) -> PaletteMenuContent? {
         guard let content = actions(at: selection) else { return nil }
         return PaletteMenuContent(
-            popover: content, selection: menuSelection, onActivate: onActivate)
+            popover: content, selection: menuSelection, query: query, onActivate: onActivate)
     }
     func pasteKeepingWindowOpen(at selection: Int) -> Bool { false }
     func perform(_ shortcut: PaletteShortcut, at selection: Int) -> Bool { false }
