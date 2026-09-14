@@ -288,6 +288,16 @@ public struct PluginCommand: Identifiable {
         self.shortcut = shortcut
         self.action = action
     }
+
+    /// A reserved id: place ``mainMenuSlot()`` in your `commands()` where the scaffold should put its
+    /// Add/Remove-from-Main-Menu toggle. Without it, the toggle is appended at the end.
+    public static let mainMenuSlotID = "__tinycast_main_menu_slot__"
+
+    /// A placeholder the scaffold swaps for the real, route-aware Add/Remove toggle — or drops when
+    /// the current view has no route to pin. Position it in `commands()` to choose where it sits.
+    public static func mainMenuSlot() -> PluginCommand {
+        PluginCommand(id: mainMenuSlotID, title: "Add to Main Menu", icon: .symbol("pin"), action: {})
+    }
 }
 
 // MARK: - Scaffold
@@ -429,13 +439,19 @@ public struct PluginScaffold<Root: View>: View {
 
     private var currentCommands: [PluginCommand] {
         var rows = commands()
-        if let route = route() {
+        let toggle: PluginCommand? = route().map { route in
             let pinned = pluginMainMenuPinned(route)
-            rows.append(PluginCommand(
-                id: "__tinycast_toggle_main_menu__",
+            return PluginCommand(
+                id: PluginCommand.mainMenuSlotID,
                 title: pinned ? "Remove from Main Menu" : "Add to Main Menu",
                 icon: .symbol(pinned ? "pin.slash" : "pin"),
-                action: { pluginToggleMainMenu(route) }))
+                action: { pluginToggleMainMenu(route) })
+        }
+        // A plugin that placed a `mainMenuSlot()` gets the toggle there; otherwise it lands at the end.
+        if let index = rows.firstIndex(where: { $0.id == PluginCommand.mainMenuSlotID }) {
+            if let toggle { rows[index] = toggle } else { rows.remove(at: index) }
+        } else if let toggle {
+            rows.append(toggle)
         }
         return rows
     }
