@@ -163,11 +163,20 @@ final class PluginManager {
         return installed.first { $0.manifest.identifier == identifier }
     }
 
+    /// The identifier of the plugin currently running, so its current view can be pinned.
+    var runningIdentifier: String? {
+        installed.first { $0.id == runningID }?.manifest.identifier
+    }
+
+    func install(forIdentifier identifier: String) -> PluginInstall? {
+        installed.first { $0.manifest.identifier == identifier }
+    }
+
     // MARK: - Session
 
     /// Loads the plugin and enters its root. Any previous session is torn down first, exactly as
     /// `ExtensionManager.run` does, so an orphaned surface never outlives the switch.
-    func launch(_ install: PluginInstall, environment: PluginEnvironment) {
+    func launch(_ install: PluginInstall, environment: PluginEnvironment, route: [String: String]? = nil) {
         stop()
         self.environment = environment
         state = .loading
@@ -177,7 +186,7 @@ final class PluginManager {
             runningID = install.id
             metadata = type(of: plugin).metadata
             // A surface plugin opens straight into its screen; no root row list to step through.
-            if let root = plugin.rootSurface(context: context(query: "")) {
+            if let root = plugin.rootSurface(context: context(query: "", route: route)) {
                 levels = [.surface(id: "__root__", view: root)]
             } else {
                 levels = [.root]
@@ -271,11 +280,12 @@ final class PluginManager {
 
     // MARK: - Helpers
 
-    private func context(query: String) -> PluginContext {
+    private func context(query: String, route: [String: String]? = nil) -> PluginContext {
         PluginContext(
             query: query,
             frontmostAppBundleID: environment.frontmostAppBundleID,
-            finderSelection: environment.finderSelection)
+            finderSelection: environment.finderSelection,
+            route: route)
     }
 
     private static func filter(_ rows: [PluginResult], query: String) -> [PluginResult] {

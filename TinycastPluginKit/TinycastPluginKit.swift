@@ -29,11 +29,39 @@ public struct PluginContext: Sendable, Equatable {
     public var frontmostAppBundleID: String?
     /// The Finder selection when Finder was frontmost, else empty.
     public var finderSelection: [URL]
+    /// The saved deep link this launch is restoring, or nil for a normal open. A plugin reads it in
+    /// `rootSurface` to open straight to a nested view.
+    public var route: [String: String]?
 
-    public init(query: String = "", frontmostAppBundleID: String? = nil, finderSelection: [URL] = []) {
+    public init(
+        query: String = "", frontmostAppBundleID: String? = nil, finderSelection: [URL] = [],
+        route: [String: String]? = nil
+    ) {
         self.query = query
         self.frontmostAppBundleID = frontmostAppBundleID
         self.finderSelection = finderSelection
+        self.route = route
+    }
+}
+
+/// A pinnable route to one of a plugin's nested views: the payload that restores it, plus how the
+/// pinned launcher entry should read. `PluginScaffold`'s `route` closure returns this for the view
+/// on top, and the host turns it into a Quicklink you can alias and bind a shortcut to.
+public struct PluginRoute: Sendable, Equatable {
+    /// Round-tripped verbatim into the launched plugin as `PluginContext.route`.
+    public var payload: [String: String]
+    public var title: String
+    public var subtitle: String?
+    public var icon: PluginIcon
+
+    public init(
+        payload: [String: String], title: String, subtitle: String? = nil,
+        icon: PluginIcon = .symbol("pin")
+    ) {
+        self.payload = payload
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
     }
 }
 
@@ -260,6 +288,16 @@ public struct PluginCommand: Identifiable {
         self.shortcut = shortcut
         self.action = action
     }
+
+    /// A reserved id: place ``mainMenuSlot()`` in your `commands()` where the scaffold should put its
+    /// Add/Remove-from-Main-Menu toggle. Without it, the toggle is appended at the end.
+    public static let mainMenuSlotID = "__tinycast_main_menu_slot__"
+
+    /// A placeholder the scaffold swaps for the real, route-aware Add/Remove toggle — or drops when
+    /// the current view has no route to pin. Position it in `commands()` to choose where it sits.
+    public static func mainMenuSlot() -> PluginCommand {
+        PluginCommand(id: mainMenuSlotID, title: "Add to Main Menu", icon: .symbol("pin"), action: {})
+    }
 }
 
 // MARK: - Scaffold
@@ -282,8 +320,12 @@ public struct PluginScaffold<Root: View>: View {
     private let commandTitle: () -> String?
     private let root: Root
     private let footerKind: PluginFooter
+    private let route: () -> PluginRoute?
 
     @Environment(\.pluginExit) private var pluginExit
+    @Environment(\.pluginToggleMainMenu) private var pluginToggleMainMenu
+    @Environment(\.pluginMainMenuPinned) private var pluginMainMenuPinned
+    @Environment(\.pluginCopyRouteLink) private var pluginCopyRouteLink
     @State private var paletteOpen = false
     @State private var selection = 0
     @State private var paletteQuery = ""
@@ -307,6 +349,7 @@ public struct PluginScaffold<Root: View>: View {
         commandTitle: @escaping () -> String? = { nil },
         listKey: @escaping (PluginListKey) -> Bool = { _ in false },
         escape: @escaping () -> Bool = { false },
+        route: @escaping () -> PluginRoute? = { nil },
         footer: PluginFooter = .standard,
         @ViewBuilder root: () -> Root
     ) {
@@ -316,6 +359,7 @@ public struct PluginScaffold<Root: View>: View {
         self.commandTitle = commandTitle
         self.listKey = listKey
         self.escape = escape
+        self.route = route
         self.footerKind = footer
         self.root = root()
     }
@@ -394,7 +438,31 @@ public struct PluginScaffold<Root: View>: View {
                 : ActionBarItem(title: "Actions", keys: ["⌘", "K"]) { togglePalette() })
     }
 
-    private var currentCommands: [PluginCommand] { commands() }
+    private var currentCommands: [PluginCommand] {
+        var rows = commands()
+        let routeCommands: [PluginCommand] = route().map { route in
+            let pinned = pluginMainMenuPinned(route)
+            return [
+                PluginCommand(
+                    id: PluginCommand.mainMenuSlotID,
+                    title: pinned ? "Remove from Main Menu" : "Add to Main Menu",
+                    icon: .symbol(pinned ? "pin.slash" : "pin"),
+                    action: { pluginToggleMainMenu(route) }),
+                PluginCommand(
+                    id: "__tinycast_copy_deep_link__",
+                    title: "Copy Deep Link",
+                    icon: .symbol("link"),
+                    action: { pluginCopyRouteLink(route) }),
+            ]
+        } ?? []
+        // A plugin that placed a `mainMenuSlot()` gets these there; otherwise they land at the end.
+        if let index = rows.firstIndex(where: { $0.id == PluginCommand.mainMenuSlotID }) {
+            rows.replaceSubrange(index...index, with: routeCommands)
+        } else {
+            rows.append(contentsOf: routeCommands)
+        }
+        return rows
+    }
 
     /// The ⌘K rows the palette actually shows: everything, or a case-insensitive title/subtitle
     /// match once the user starts typing to filter.
@@ -889,9 +957,37 @@ public struct PluginExitKey: EnvironmentKey {
     public static let defaultValue: @MainActor () -> Void = {}
 }
 
+/// How a scaffold pins/unpins the current view to the launcher, plus whether it already is: the
+/// host injects both, keyed on the route so a renamed pin still resolves. The scaffold's auto-added
+/// command toggles on the pinned state.
+public struct PluginToggleMainMenuKey: EnvironmentKey {
+    public static let defaultValue: @MainActor (PluginRoute) -> Void = { _ in }
+}
+
+public struct PluginMainMenuPinnedKey: EnvironmentKey {
+    public static let defaultValue: @MainActor (PluginRoute) -> Bool = { _ in false }
+}
+
+/// How a scaffold copies the current view's deep link to the clipboard; the host encodes it.
+public struct PluginCopyRouteLinkKey: EnvironmentKey {
+    public static let defaultValue: @MainActor (PluginRoute) -> Void = { _ in }
+}
+
 public extension EnvironmentValues {
     var pluginExit: @MainActor () -> Void {
         get { self[PluginExitKey.self] }
         set { self[PluginExitKey.self] = newValue }
+    }
+    var pluginToggleMainMenu: @MainActor (PluginRoute) -> Void {
+        get { self[PluginToggleMainMenuKey.self] }
+        set { self[PluginToggleMainMenuKey.self] = newValue }
+    }
+    var pluginMainMenuPinned: @MainActor (PluginRoute) -> Bool {
+        get { self[PluginMainMenuPinnedKey.self] }
+        set { self[PluginMainMenuPinnedKey.self] = newValue }
+    }
+    var pluginCopyRouteLink: @MainActor (PluginRoute) -> Void {
+        get { self[PluginCopyRouteLinkKey.self] }
+        set { self[PluginCopyRouteLinkKey.self] = newValue }
     }
 }

@@ -14,6 +14,12 @@ enum LauncherInlineEditor {
     static func shortcutBox(action: HotKeyAction) -> @MainActor @Sendable () -> AnyView {
         { AnyView(ShortcutRecorder(action: action, recordingAccent: false, showsConflictInline: true)) }
     }
+
+    /// The trailing box for the "Rename Quicklink" row: the saved name, or the draft while editing.
+    @MainActor
+    static func renameBox(id: UUID) -> @MainActor @Sendable () -> AnyView {
+        { AnyView(MenuRenameBox(id: id)) }
+    }
 }
 
 /// Shows the saved alias, or the live draft with a caret while its row's editor is open.
@@ -49,6 +55,46 @@ private struct MenuAliasBox: View {
     }
 
     /// Faded until the row is being edited, so it reads as settled once ↵ or a click outside commits.
+    private var textColor: Color {
+        if value.isEmpty { return Theme.Colors.textTertiary }
+        return editing ? Theme.Colors.textPrimary : Theme.Colors.textSecondary
+    }
+}
+
+/// Shows the quicklink's saved name, or the live draft with a caret while its row is being renamed.
+private struct MenuRenameBox: View {
+    let id: UUID
+    @Environment(\.metrics) private var metrics
+    @Environment(PaletteState.self) private var palette
+    @Environment(QuicklinkStore.self) private var quicklinks
+
+    private var editing: Bool { palette.renameEditID == id }
+    private var value: String {
+        editing ? palette.renameDraft : (quicklinks.quicklink(id: id)?.name ?? "")
+    }
+
+    var body: some View {
+        HStack(spacing: 1) {
+            Text(value.isEmpty ? "Rename" : value)
+                .font(metrics.typography.keyCap)
+                .foregroundStyle(textColor)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if editing {
+                RoundedRectangle(cornerRadius: 0.5)
+                    .fill(Theme.Colors.textSecondary)
+                    .frame(width: 1.5, height: metrics.scaled(12))
+            }
+        }
+        .frame(width: metrics.scaled(112), height: metrics.scaled(20))
+        .background(
+            RoundedRectangle(cornerRadius: metrics.radius.menuRow, style: .continuous)
+                .fill(Theme.Colors.cardFill))
+        .overlay(
+            RoundedRectangle(cornerRadius: metrics.radius.menuRow, style: .continuous)
+                .strokeBorder(Theme.Colors.cardStroke, lineWidth: 1))
+    }
+
     private var textColor: Color {
         if value.isEmpty { return Theme.Colors.textTertiary }
         return editing ? Theme.Colors.textPrimary : Theme.Colors.textSecondary

@@ -60,6 +60,10 @@ final class PaletteState {
     var aliasEditKey: String?
     /// The alias being typed while `aliasEditKey` is set; the menu row reads it live.
     var aliasDraft = ""
+    /// The quicklink being renamed inline on its ⌘K row, or nil; while set the menu stays up.
+    var renameEditID: UUID?
+    /// The name being typed while `renameEditID` is set; the menu row reads it live.
+    var renameDraft = ""
     /// True once ⌘ has been *held*, which numbers the favorite rows. The panel is the only writer.
     private(set) var commandHeld = false
     /// A chord is a tap, so the numbering waits out the tap before it claims the trailing labels.
@@ -151,6 +155,8 @@ final class PaletteState {
         pendingArgumentEntryID = nil
         aliasEditKey = nil
         aliasDraft = ""
+        renameEditID = nil
+        renameDraft = ""
         clipboardFilter = .all
         fileSearchFilter = .all
         emojiCategoryFilter = .all

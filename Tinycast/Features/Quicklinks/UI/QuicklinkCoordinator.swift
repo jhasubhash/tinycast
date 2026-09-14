@@ -146,6 +146,11 @@ final class QuicklinkCoordinator {
     private func performQuicklinkOpen(
         _ quicklink: Quicklink, link: String, forcingDefaultApp: Bool
     ) {
+        // A saved plugin deep link opens the plugin in place, never the browser.
+        if let route = PluginRouteURL.decode(link) {
+            core.pluginCoordinator.launchRoute(identifier: route.identifier, payload: route.payload)
+            return
+        }
         if windowController.isVisible { paletteCoordinator.hidePalette(restoreFocus: false) }
         let openWith = forcingDefaultApp ? nil : quicklink.openWithBundleID
         Task {
@@ -249,6 +254,24 @@ final class QuicklinkCoordinator {
     func editQuicklink(_ quicklink: Quicklink?) {
         core.pendingQuicklinkEdit = QuicklinkEditRequest(quicklink: quicklink)
         settingsCoordinator.showSettings(tab: .quicklinks)
+    }
+
+    /// Opens the inline rename editor on the quicklink's ⌘K row, seeded with its name; ↵ commits.
+    func configureRename(id: UUID) {
+        guard let quicklink = store.quicklink(id: id) else { return }
+        core.hotKeys.recordingAction = nil
+        core.palette.aliasEditKey = nil
+        core.palette.renameDraft = quicklink.name
+        core.palette.renameEditID = id
+    }
+
+    /// Commits an inline rename; a blank or unchanged name is left alone.
+    func renameQuicklink(id: UUID, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, var quicklink = store.quicklink(id: id), quicklink.name != trimmed
+        else { return }
+        quicklink.name = trimmed
+        try? store.update(quicklink)
     }
 
     @discardableResult
