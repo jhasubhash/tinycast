@@ -129,6 +129,21 @@ Or `open Tinycast.xcodeproj` and ⌘R. Debug is its own channel — `Tinycast De
 `com.tinycast.app.dev` — with its own prefs, caches and TCC grants, so it cannot see or clobber an
 installed Tinycast. It starts with no hotkeys bound; record one in Settings → General.
 
+**After a sync + rebuild, quit and relaunch a running `Tinycast Dev` — a stale instance is not
+harmless.** The extension JS runtime (`Resources/RaycastRuntime.generated.js`) and its Swift host
+(`Features/Extensions/Service/`) ship as one matched pair and change together — upstream `#697`, for
+one, reworked async `exec`/`execFile` from a single `proc.run` host call into `proc.start` + `proc.wait`
+across *both* sides. A process launched before the rebuild keeps its old runtime talking to the old
+host, so nothing breaks; but rebuild the app underneath a still-running instance and every
+`promisify(execFile)` extension — kill-process's `/bin/ps`, reload-extensions' `npm run build` — fails
+with `undefined is not an object (evaluating 'n.stdout')` until you relaunch. `open` alone will not
+replace a running copy:
+
+```sh
+osascript -e 'quit app "Tinycast Dev"'
+open "build/DerivedData/Build/Products/Debug/Tinycast Dev.app"
+```
+
 Keeping the `Tinycast Self-Signed` identity is what makes macOS remember the Accessibility grant across
 rebuilds. Do not let a build fall back to ad-hoc signing — the grant is then re-requested every time.
 
