@@ -235,8 +235,8 @@ public final class PluginNavigator {
 
 // MARK: - Command palette
 
-/// One row of a surface's ⌘K command palette. `shortcut` is a display hint only — the palette
-/// itself is opened with ⌘K and driven with the arrows and Return.
+/// One row of a surface's ⌘K command palette. `shortcut` is a display hint only — the palette is
+/// opened with ⌘K, filtered by typing, and driven with the arrows and Return.
 public struct PluginCommand: Identifiable {
     public let id: String
     public var title: String
@@ -270,13 +270,15 @@ public struct PluginCommand: Identifiable {
 /// claims those keys through a local monitor, so they reach the surface whatever holds focus.
 ///
 /// Escape pops the stack; at the root it falls through to the host, which leaves the plugin. ⌘K
-/// toggles the palette; while it is open the arrows and Return drive it and Escape closes it.
+/// toggles the palette; while it is open typing filters the rows, the arrows and Return drive them
+/// and Escape closes it.
 @MainActor
 public struct PluginScaffold<Root: View>: View {
     private let navigator: PluginNavigator
     private let primaryLabel: String
     private let commands: () -> [PluginCommand]
     private let listKey: (PluginListKey) -> Bool
+    private let escape: () -> Bool
     private let commandTitle: () -> String?
     private let root: Root
 
@@ -284,6 +286,7 @@ public struct PluginScaffold<Root: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var paletteOpen = false
     @State private var selection = 0
+    @State private var paletteQuery = ""
     @State private var monitor = KeyMonitor()
 
     /// - Parameters:
@@ -291,14 +294,17 @@ public struct PluginScaffold<Root: View>: View {
     ///   - primaryActionLabel: what Return does on the current view, shown in the footer (e.g. "Open").
     ///   - commands: the ⌘K rows for whatever view is on top; re-read every time the palette opens.
     ///   - commandTitle: the heading atop the ⌘K palette — what the commands act on, e.g. a ticker.
-    ///   - listKey: ↑/↓/Return for a list on the current view, driven by the scaffold's own monitor
+    ///   - listKey: ↑/↓/←/→/Return for a list on the current view, driven by the scaffold's own monitor
     ///     so it never depends on which control holds focus. Return true when you consumed the key.
+    ///   - escape: Escape, offered to the surface before the stack pops and before the plugin is left,
+    ///     so a live search can be cleared first. Return true when you consumed the key.
     public init(
         navigator: PluginNavigator,
         primaryActionLabel: String = "",
         commands: @escaping () -> [PluginCommand] = { [] },
         commandTitle: @escaping () -> String? = { nil },
         listKey: @escaping (PluginListKey) -> Bool = { _ in false },
+        escape: @escaping () -> Bool = { false },
         @ViewBuilder root: () -> Root
     ) {
         self.navigator = navigator
@@ -306,6 +312,7 @@ public struct PluginScaffold<Root: View>: View {
         self.commands = commands
         self.commandTitle = commandTitle
         self.listKey = listKey
+        self.escape = escape
         self.root = root()
     }
 
@@ -327,7 +334,11 @@ public struct PluginScaffold<Root: View>: View {
             .overlay(alignment: .bottomTrailing) {
                 if paletteOpen {
                     CommandPaletteView(
-                        header: commandTitle(), commands: currentCommands, selection: $selection, run: run)
+                        header: commandTitle(),
+                        query: paletteQuery,
+                        commands: visibleCommands,
+                        selection: $selection,
+                        run: run)
                         .padding(.trailing, 12)
                         .padding(.bottom, 44)
                         .transition(.opacity)
@@ -377,7 +388,7 @@ public struct PluginScaffold<Root: View>: View {
                         }
                     }
                     if !currentCommands.isEmpty {
-                        GlassBarButton(action: { paletteOpen.toggle(); selection = 0 }) {
+                        GlassBarButton(action: togglePalette) {
                             Text("Actions")
                             KeyCap(text: "⌘", outline: true)
                             KeyCap(text: "K", outline: true)
@@ -394,8 +405,35 @@ public struct PluginScaffold<Root: View>: View {
 
     private var currentCommands: [PluginCommand] { commands() }
 
-    private func run(_ index: Int) {
+    /// The ⌘K rows the palette actually shows: everything, or a case-insensitive title/subtitle
+    /// match once the user starts typing to filter.
+    private var visibleCommands: [PluginCommand] {
         let rows = currentCommands
+        let query = paletteQuery.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !query.isEmpty else { return rows }
+        return rows.filter {
+            $0.title.lowercased().contains(query)
+                || ($0.subtitle?.lowercased().contains(query) ?? false)
+        }
+    }
+
+    private func togglePalette() {
+        paletteOpen.toggle()
+        if paletteOpen {
+            paletteQuery = ""
+            selection = 0
+        }
+    }
+
+    /// A single ordinary character — letter, digit, space or punctuation — versus a control or arrow
+    /// key, so only real text lands in the filter.
+    private func isTypable(_ text: String) -> Bool {
+        guard text.count == 1, let scalar = text.unicodeScalars.first else { return false }
+        return scalar.value >= 0x20 && scalar.value != 0x7F && scalar.value < 0xF700
+    }
+
+    private func run(_ index: Int) {
+        let rows = visibleCommands
         guard rows.indices.contains(index) else { return }
         paletteOpen = false
         rows[index].action()
@@ -407,18 +445,23 @@ public struct PluginScaffold<Root: View>: View {
 
         if chord.command, chord.chars == "k" {
             guard !currentCommands.isEmpty else { return false }
-            paletteOpen.toggle()
-            selection = 0
+            togglePalette()
             return true
         }
 
         if paletteOpen {
             switch chord.keyCode {
             case 53: paletteOpen = false
-            case 125: selection = min(selection + 1, max(currentCommands.count - 1, 0))
+            case 125: selection = min(selection + 1, max(visibleCommands.count - 1, 0))
             case 126: selection = max(selection - 1, 0)
             case 36, 76: run(selection)
-            default: break
+            case 51:
+                if !paletteQuery.isEmpty { paletteQuery.removeLast(); selection = 0 }
+            default:
+                if chord.typing, let text = chord.text, isTypable(text) {
+                    paletteQuery.append(text)
+                    selection = 0
+                }
             }
             return true
         }
@@ -430,7 +473,13 @@ public struct PluginScaffold<Root: View>: View {
             case 123: if listKey(.left) { return true }
             case 124: if listKey(.right) { return true }
             case 36, 76: if listKey(.submit) { return true }
-            case 53: if navigator.pop() { return true }; pluginExit(); return true
+            // The surface answers first — a live search clears before the stack unwinds — then the
+            // stack pops, and only a root with nothing left to undo leaves the plugin.
+            case 53:
+                if escape() { return true }
+                if navigator.pop() { return true }
+                pluginExit()
+                return true
             default: break
             }
         }
@@ -454,7 +503,12 @@ private struct KeyChord: Sendable {
     let keyCode: UInt16
     let command: Bool
     let bare: Bool
+    /// No ⌘/⌥/⌃ held (Shift is fine): the event may contribute a character to the palette filter.
+    let typing: Bool
+    /// Lowercased and modifier-stripped, for matching a shortcut like ⌘K.
     let chars: String?
+    /// As typed — case and symbols intact — for the palette's filter field.
+    let text: String?
 }
 
 /// Holds a local key monitor for a scaffold's lifetime; a class so `@State` can own it across the
@@ -470,12 +524,16 @@ private final class KeyMonitor {
     func start() {
         guard token == nil else { return }
         token = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            let flags = event.modifierFlags
+            let mods = flags.intersection([.command, .option, .control, .shift])
             let chord = KeyChord(
                 keyCode: event.keyCode,
                 command: mods == .command,
                 bare: mods.isEmpty,
-                chars: event.charactersIgnoringModifiers?.lowercased())
+                typing: !flags.contains(.command) && !flags.contains(.option)
+                    && !flags.contains(.control),
+                chars: event.charactersIgnoringModifiers?.lowercased(),
+                text: event.characters)
             return MainActor.assumeIsolated { self?.handler?(chord) ?? false } ? nil : event
         }
     }
@@ -493,6 +551,7 @@ private final class KeyMonitor {
 @MainActor
 private struct CommandPaletteView: View {
     let header: String?
+    let query: String
     let commands: [PluginCommand]
     @Binding var selection: Int
     let run: (Int) -> Void
@@ -506,9 +565,17 @@ private struct CommandPaletteView: View {
                     .lineLimit(1).truncationMode(.tail)
                     .padding(.horizontal, 10).padding(.top, 4).padding(.bottom, 2)
             }
-            ForEach(Array(commands.enumerated()), id: \.element.id) { index, command in
-                row(command, selected: index == selection)
-                    .onTapGesture { run(index) }
+            searchField
+            if commands.isEmpty {
+                Text("No matching actions")
+                    .font(.callout)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, minHeight: 36)
+            } else {
+                ForEach(Array(commands.enumerated()), id: \.element.id) { index, command in
+                    row(command, selected: index == selection)
+                        .onTapGesture { run(index) }
+                }
             }
         }
         .padding(6)
@@ -518,6 +585,28 @@ private struct CommandPaletteView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(.primary.opacity(0.14), lineWidth: 1))
         .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            if query.isEmpty {
+                Text("Search actions…").foregroundStyle(.tertiary)
+            } else {
+                Text(query).foregroundStyle(.primary)
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.body)
+        .lineLimit(1)
+        .padding(.horizontal, 8)
+        .frame(minHeight: 30)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(.primary.opacity(0.08)).frame(height: 1)
+        }
+        .padding(.bottom, 2)
     }
 
     private func row(_ command: PluginCommand, selected: Bool) -> some View {
