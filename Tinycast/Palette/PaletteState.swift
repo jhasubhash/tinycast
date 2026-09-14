@@ -24,6 +24,8 @@ final class PaletteState {
     var fileSearchFilter: FileSearchFilter = .all
     /// Whether file search draws its Quick Look overlay; it follows whatever row is selected.
     var fileSearchQuickLook = false
+    /// What the user has typed to filter the open ⌘K / footer menu; empty until a menu is up.
+    var menuFilterQuery = ""
     /// Ordering out leaves the SwiftUI tree mounted, so a media preview needs this to stop playing.
     private(set) var isVisible = false
     /// Changes every time the palette is shown so the search field can re-focus.
@@ -145,6 +147,7 @@ final class PaletteState {
         forceExpanded = false
         dropHoverHighlight()
         menuOpen = false
+        menuFilterQuery = ""
         focusToken = UUID()
     }
 

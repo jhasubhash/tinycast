@@ -21,6 +21,8 @@ final class PalettePanel: NSPanel {
     var onHeaderFieldBoundaryArrow: ((HeaderFieldBoundary) -> Bool)?
     /// Keys typed while an inline ⌘K editor is open on a menu row; it consumes them itself.
     var onMenuInlineKey: ((NSEvent) -> Bool)?
+    /// Text and backspace typed while a menu is open, so it filters as you type instead of freezing.
+    var onMenuFilterKey: ((NSEvent) -> Bool)?
     /// Arms hover from `sendEvent`, the one place both event streams pass through.
     weak var paletteState: PaletteState? {
         didSet {
@@ -172,6 +174,10 @@ final class PalettePanel: NSPanel {
         }
         // An inline ⌘K editor claims the keys ahead of the freeze, so typing lands in its field.
         if event.type == .keyDown, paletteState?.menuOpen == true, onMenuInlineKey?(event) == true {
+            return
+        }
+        // Text typed at an open menu drives its filter; nav keys and chords still fall through below.
+        if event.type == .keyDown, paletteState?.menuOpen == true, onMenuFilterKey?(event) == true {
             return
         }
         // A footer menu owns the keyboard. See docs/features/palette.md#menu-open-input-freeze.

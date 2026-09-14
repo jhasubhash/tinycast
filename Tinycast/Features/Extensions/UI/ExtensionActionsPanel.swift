@@ -48,6 +48,8 @@ struct ExtensionActionItem {
 struct ExtensionActionsPanel: View {
     @Environment(\.metrics) private var metrics
     var header: String?
+    /// What the user has typed to filter the rows; the field shows only while it is non-empty.
+    var query: String = ""
     let items: [ExtensionActionItem]
     @Binding var selection: Int
     let onActivate: (Int) -> Void
@@ -69,49 +71,56 @@ struct ExtensionActionsPanel: View {
             bottomTrailingRadius: metrics.size.menuButton / 2,
             topTrailingRadius: metrics.radius.menuPanel,
             style: .continuous)
-        return ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if let header {
-                        Text(header)
-                            .font(metrics.typography.sectionHeader)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .frame(height: metrics.size.menuSectionHeader, alignment: .leading)
-                            .padding(.horizontal, metrics.spacing.lg)
-                            .padding(.top, metrics.spacing.xs)
-                            .padding(.bottom, metrics.spacing.xs / 2)
-                        Color.clear.frame(height: panel.rowSpacing)
-                    }
-                    // Index-as-id is stable: a panel's rows never reorder while it is open.
-                    ForEach(items.indices, id: \.self) { index in
+        return VStack(alignment: .leading, spacing: panel.rowSpacing) {
+            if !query.isEmpty { searchField(query) }
+            if items.isEmpty, !query.isEmpty {
+                emptyState
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
-                            rowBoundary(before: index)
-                            ExtensionActionRow(
-                                item: items[index],
-                                selected: index == selection,
-                                onActivate: { onActivate(index) }
-                            )
-                            .onContinuousHover { if case .active = $0 { hover(index) } }
+                            if let header {
+                                Text(header)
+                                    .font(metrics.typography.sectionHeader)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .frame(height: metrics.size.menuSectionHeader, alignment: .leading)
+                                    .padding(.horizontal, metrics.spacing.lg)
+                                    .padding(.top, metrics.spacing.xs)
+                                    .padding(.bottom, metrics.spacing.xs / 2)
+                                Color.clear.frame(height: panel.rowSpacing)
+                            }
+                            // Index-as-id is stable: a panel's rows never reorder while it is open.
+                            ForEach(items.indices, id: \.self) { index in
+                                VStack(alignment: .leading, spacing: 0) {
+                                    rowBoundary(before: index)
+                                    ExtensionActionRow(
+                                        item: items[index],
+                                        selected: index == selection,
+                                        onActivate: { onActivate(index) }
+                                    )
+                                    .onContinuousHover { if case .active = $0 { hover(index) } }
+                                }
+                                .id(index)
+                            }
                         }
-                        .id(index)
+                    }
+                    .frame(height: min(contentHeight, maximumHeight))
+                    .scrollBounceBehavior(
+                        contentHeight > maximumHeight ? .always : .basedOnSize
+                    )
+                    // `never`, not `hidden`: hidden still lets AppKit claim the scroller's gutter.
+                    .scrollIndicators(.never)
+                    .overflowFade(band: panel.fadeBand, includingTop: true)
+                    .onChange(of: selection) {
+                        let movedByPointer = hoverSelection == selection
+                        hoverSelection = nil
+                        guard !movedByPointer else { return }
+                        // No anchor: reveal the row, never re-centre the list around it.
+                        proxy.scrollTo(selection)
                     }
                 }
-            }
-            .frame(height: min(contentHeight, maximumHeight))
-            .scrollBounceBehavior(
-                contentHeight > maximumHeight ? .always : .basedOnSize
-            )
-            // `never`, not `hidden`: hidden still lets AppKit claim the scroller's gutter.
-            .scrollIndicators(.never)
-            .overflowFade(band: panel.fadeBand, includingTop: true)
-            .onChange(of: selection) {
-                let movedByPointer = hoverSelection == selection
-                hoverSelection = nil
-                guard !movedByPointer else { return }
-                // No anchor: reveal the row, never re-centre the list around it.
-                proxy.scrollTo(selection)
             }
         }
         .padding(metrics.spacing.sm)
@@ -139,6 +148,32 @@ struct ExtensionActionsPanel: View {
         guard palette.hoverHighlightArmed, index != selection else { return }
         hoverSelection = index
         selection = index
+    }
+
+    /// The panel's own field — an extension never borrows a launcher control. Shown only while typing.
+    private func searchField(_ text: String) -> some View {
+        HStack(spacing: metrics.spacing.sm) {
+            Image(systemName: "magnifyingglass")
+                .font(metrics.typography.menuIcon)
+                .foregroundStyle(.secondary)
+                .frame(width: metrics.size.menuIcon, height: metrics.size.menuIcon)
+            Text(text)
+                .font(metrics.typography.menuRow)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, metrics.spacing.md)
+        .frame(minHeight: panel.rowHeight, alignment: .leading)
+    }
+
+    private var emptyState: some View {
+        Text("No matching actions")
+            .font(metrics.typography.menuRow)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, metrics.spacing.md)
+            .frame(maxWidth: .infinity, minHeight: panel.rowHeight, alignment: .leading)
     }
 }
 

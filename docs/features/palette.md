@@ -427,7 +427,8 @@ long it grows. `MenuPanel.canBecomeKey` is `false` so the palette keeps key stat
 hover arming — rows light on real pointer movement, never on a scroll under a still cursor.
 
 The panel is a second SwiftUI hierarchy, so it observes nothing of `RootPaletteView`'s `@State`:
-`syncMenuPanel` pushes a rebuilt tree on every `openMenu` or `menuSelection` change, and
+`syncMenuPanel` pushes a rebuilt tree on every `openMenu`, `menuSelection` or `menuFilterQuery`
+change, and
 `paletteEnvironment` injects the same stores into both hierarchies so they cannot drift.
 `WindowReader` reports the palette's `NSWindow`, which the menu's frame is placed against.
 
@@ -439,17 +440,23 @@ the shadow after layout and display. Native `PopoverMenu` content reads its moti
 changes cannot silently alter an extension surface. Each extension menu also supplies its own clip
 path; the controller applies it as an opaque value and never reconstructs extension geometry.
 
-## Menu-open input freeze
+## Menu-open input drives the filter
 
-While a popover menu (⌘K Actions / app menu / clipboard type filter) is open the search field reads as inert but
-**never resigns first responder** — resigning makes the `NSTextField` swap between its field-editor
-and cell rendering, shifting the text / placeholder a point or two, so focus stays put. Input is
-frozen instead:
+While a popover menu (⌘K Actions / app menu / clipboard type filter) is open the search field reads as
+inert but **never resigns first responder** — resigning makes the `NSTextField` swap between its
+field-editor and cell rendering, shifting the text / placeholder a point or two, so focus stays put.
+Typing filters the open menu instead:
 
 - `RootPaletteView` mirrors the open state into `PaletteState.menuOpen`, whose `didSet` fires
-  `onMenuOpenChanged`.
-- `PalettePanel.sendEvent` then swallows text-editing keystrokes while `menuOpen` (letting ⌘/⌃ chords
-  and menu-nav keys through to SwiftUI `onKeyPress`), which is how ⌘. and ⌃X still reach their rows.
+  `onMenuOpenChanged`, and clears `PaletteState.menuFilterQuery` on every open so a menu starts wide.
+- `PalettePanel.sendEvent` routes printable text and Backspace to `onMenuFilterKey` while `menuOpen`
+  — it edits `menuFilterQuery` — and lets ⌘/⌃ chords and the menu-nav keys (arrows, ↵, ⇥, Esc)
+  through to SwiftUI `onKeyPress`, which is how ⌘. and ⌃X still reach their rows.
+- `menuContent` threads `menuFilterQuery` into every menu it builds. `PaletteMenuContent` filters the
+  rows by a case-insensitive `PopoverMenuItem.matches`, so its row count, activation and rendering all
+  address the same visible subset; `PopoverMenu` (native) and `ExtensionActionsPanel` (the extensions'
+  own copy, per the Extensions invariant) each reveal a search field once the query is non-empty and
+  show "No matching actions" when nothing matches.
 - The caret is hidden by clearing SwiftUI's **own** live field editor's `insertionPointColor`. SwiftUI
   force-casts its field editor to a private subclass, so vending a custom one crashes — only the
   existing one can be tuned.

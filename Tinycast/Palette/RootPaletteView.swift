@@ -185,40 +185,43 @@ struct RootPaletteView: View {
 
     /// The one source every menu path addresses rows through, so none can disagree.
     private var menuContent: PaletteMenuContent? {
+        let query = vm.menuFilterQuery
         switch openMenu {
         case .actions:
             let screen = screen
             return screen.menuContent(
-                at: selection(in: screen), menuSelection: $menuSelection,
+                at: selection(in: screen), menuSelection: $menuSelection, query: query,
                 onActivate: activateMenuItem)
         case .app:
             return PaletteMenuContent(
-                popover: appMenuContent, selection: $menuSelection, onActivate: activateMenuItem)
+                popover: appMenuContent, selection: $menuSelection, query: query,
+                onActivate: activateMenuItem)
         case .clipboardFilter:
             return PaletteMenuContent(
                 popover: clipboardFilterContent, selection: $menuSelection,
-                width: headerMenuWidth, onActivate: activateMenuItem)
+                width: headerMenuWidth, query: query, onActivate: activateMenuItem)
         case .fileSearchFilter:
             return PaletteMenuContent(
                 popover: fileSearchFilterContent, selection: $menuSelection,
-                width: headerMenuWidth, onActivate: activateMenuItem)
+                width: headerMenuWidth, query: query, onActivate: activateMenuItem)
         case .aiModel:
             return PaletteMenuContent(
                 popover: AIModelMenu.models(coordinator: core.aiChatCoordinator),
-                selection: $menuSelection, width: headerMenuWidth, onActivate: activateMenuItem)
+                selection: $menuSelection, width: headerMenuWidth,
+                query: query, onActivate: activateMenuItem)
         case .aiReasoning:
             return PaletteMenuContent(
                 popover: AIModelMenu.reasoning(
                     coordinator: core.aiChatCoordinator, settings: core.aiSettings),
                 selection: $menuSelection,
-                width: headerMenuWidth, onActivate: activateMenuItem)
+                width: headerMenuWidth, query: query, onActivate: activateMenuItem)
         case .argumentOptions:
             guard let field = argumentOptionsField,
                 let popover = headerAccessory?.optionsMenu(field)
             else { return nil }
             return PaletteMenuContent(
                 popover: popover, selection: $menuSelection, width: headerMenuWidth,
-                onActivate: activateMenuItem)
+                query: query, onActivate: activateMenuItem)
         case .extensionAccessory:
             return extensionCommandScreen?.searchAccessoryMenu(
                 menuSelection: $menuSelection, onActivate: activateMenuItem)
@@ -375,10 +378,17 @@ struct RootPaletteView: View {
             .onChange(of: openMenu) {
                 vm.menuOpen = menuOpen
                 guard menuOpen else { return }
+                // A fresh menu always opens unfiltered.
+                vm.menuFilterQuery = ""
                 syncMenuPanel(presenting: true)
             }
             // The hosted tree is its own hierarchy, so the highlight has to be pushed into it.
             .onChange(of: menuSelection) { syncMenuPanel(presenting: false) }
+            // Typing narrows the open menu: rebuild its rows and start the highlight at the top.
+            .onChange(of: vm.menuFilterQuery) {
+                menuSelection = 0
+                syncMenuPanel(presenting: false)
+            }
             .onDisappear {
                 menuPanel.hide()
                 (hostWindow as? PalettePanel)?.onHeaderFieldBoundaryArrow = nil

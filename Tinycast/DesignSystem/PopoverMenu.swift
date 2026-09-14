@@ -59,6 +59,15 @@ struct PopoverMenuItem {
             sectionTitle: sectionTitle, startsSection: startsSection, shortcut: shortcut,
             isDestructive: isDestructive, action: action)
     }
+    /// Whether the menu's type-to-filter should keep this row: a case-insensitive match on the
+    /// text the row shows — its title or its stated detail.
+    func matches(_ query: String) -> Bool {
+        let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !needle.isEmpty else { return true }
+        if title.lowercased().contains(needle) { return true }
+        if let detail, detail.lowercased().contains(needle) { return true }
+        return false
+    }
 }
 
 /// A menu's header and rows, built once and consumed by render and keyboard alike.
@@ -98,6 +107,8 @@ struct PopoverMenu: View {
     var width: CGFloat?
     let onActivate: (Int) -> Void
     var attachment = Attachment.none
+    /// What the user has typed to filter the rows; the field appears only while it is non-empty.
+    var query: String = ""
 
     /// The palette arms this only once the pointer has moved of its own accord.
     @Environment(PaletteState.self) private var palette
@@ -105,14 +116,48 @@ struct PopoverMenu: View {
     /// Set by the pointer so the reveal can tell its own move from a keyboard one.
     @State private var pointerSelection: Int?
 
+    /// The rows the caller passes are already filtered by `query`; this only reveals what was typed.
     var body: some View {
         let shape = SurfaceShape(
             attachment: attachment, radius: metrics.radius.menuPanel,
             attachedRadius: metrics.size.menuButton / 2)
-        rows
-            .padding(metrics.spacing.sm)
-            .frame(width: width ?? metrics.size.menuWidth)
-            .glassEffect(.regular, in: shape)
+        VStack(alignment: .leading, spacing: metrics.size.menuRowSpacing) {
+            if !query.isEmpty { searchField(query) }
+            if items.isEmpty, !query.isEmpty {
+                emptyState
+            } else {
+                rows
+            }
+        }
+        .padding(metrics.spacing.sm)
+        .frame(width: width ?? metrics.size.menuWidth)
+        .glassEffect(.regular, in: shape)
+    }
+
+    /// Only mounted once the user starts typing, so an unfiltered menu carries no extra chrome.
+    private func searchField(_ text: String) -> some View {
+        HStack(spacing: metrics.spacing.sm) {
+            Image(systemName: "magnifyingglass")
+                .font(metrics.typography.menuIcon)
+                .foregroundStyle(.secondary)
+                .frame(width: metrics.size.menuIcon, height: metrics.size.menuIcon)
+            Text(text)
+                .font(metrics.typography.menuRow)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, metrics.spacing.md)
+        .frame(minHeight: metrics.size.menuRowHeight, alignment: .leading)
+    }
+
+    private var emptyState: some View {
+        Text("No matching actions")
+            .font(metrics.typography.menuRow)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, metrics.spacing.md)
+            .frame(maxWidth: .infinity, minHeight: metrics.size.menuRowHeight, alignment: .leading)
     }
 
     private func headerLabel(_ text: String) -> some View {
