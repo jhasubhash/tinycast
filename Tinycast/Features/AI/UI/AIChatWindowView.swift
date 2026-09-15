@@ -178,12 +178,26 @@ struct AIChatWindowView: View {
     }
 
     private var composer: some View {
-        VStack(alignment: .leading, spacing: metrics.spacing.sm) {
+        VStack(alignment: .leading, spacing: metrics.spacing.md) {
             textField
+                .padding(.horizontal, metrics.spacing.md)
+                .padding(.vertical, metrics.spacing.sm)
+                .background(fieldShape.fill(Theme.Colors.cardFill))
+                .overlay(fieldShape.strokeBorder(Theme.Colors.cardStroke, lineWidth: Theme.Size.hairline))
             statusRow
         }
         .padding(.horizontal, metrics.spacing.xl)
-        .padding(.vertical, metrics.spacing.md)
+        .padding(.top, metrics.spacing.md)
+        .padding(.bottom, metrics.spacing.lg)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Theme.Colors.separator)
+                .frame(height: Theme.Size.hairline)
+        }
+    }
+
+    private var fieldShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: metrics.radius.barControl, style: .continuous)
     }
 
     /// An empty title, plus its own overlay for the prompt: SwiftUI's native placeholder distorts
