@@ -16,6 +16,8 @@ enum HotKeyAction: Hashable, Sendable {
     case windowLayout(id: UUID)
     case quicklink(id: UUID)
     case quickAction(id: UUID)
+    /// A user-created Assistant chat bar, keyed by its stable id.
+    case assistant(id: UUID)
     /// Keyed by `AppEntry.id`, which is what survives a reinstall of the extension.
     case extensionCommand(entryID: String)
     /// Keyed by `AppEntry.id`, which survives a reinstall of the plugin.
@@ -35,6 +37,7 @@ enum HotKeyAction: Hashable, Sendable {
         case .windowLayout(let id): "hotkey.windowLayout." + id.uuidString.lowercased()
         case .quicklink(let id): "hotkey.quicklink." + id.uuidString.lowercased()
         case .quickAction(let id): "hotkey.quickAction." + id.uuidString.lowercased()
+        case .assistant(let id): "hotkey.assistant." + id.uuidString.lowercased()
         case .extensionCommand(let entryID): "hotkey.extensionCommand." + entryID
         case .pluginCommand(let entryID): "hotkey.pluginCommand." + entryID
         }

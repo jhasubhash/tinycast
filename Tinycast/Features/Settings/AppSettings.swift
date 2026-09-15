@@ -308,6 +308,14 @@ final class AppSettings {
         }
     }
 
+    /// With AI on, controls only whether the assistants' "Ask <Name>" rows appear in the launcher.
+    var aiAssistantsShowInLauncher: Bool {
+        didSet {
+            defaults.set(
+                aiAssistantsShowInLauncher, forKey: Key.aiAssistantsShowInLauncher.rawValue)
+        }
+    }
+
     /// Also keyword-expansion consent, so it confirms first and never rides a backup.
     var snippetsEnabled: Bool {
         didSet { defaults.set(snippetsEnabled, forKey: Key.snippetsEnabled.rawValue) }
@@ -597,6 +605,9 @@ final class AppSettings {
         customCommandsShowInLauncher =
             defaults.object(forKey: Key.customCommandsShowInLauncher.rawValue) == nil
             || defaults.bool(forKey: Key.customCommandsShowInLauncher.rawValue)
+        aiAssistantsShowInLauncher =
+            defaults.object(forKey: Key.aiAssistantsShowInLauncher.rawValue) == nil
+            || defaults.bool(forKey: Key.aiAssistantsShowInLauncher.rawValue)
         snippetsEnabled = defaults.bool(forKey: Key.snippetsEnabled.rawValue)
         quickActionsEnabled = defaults.bool(forKey: Key.quickActionsEnabled.rawValue)
         snippetsShowInLauncher =

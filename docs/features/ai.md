@@ -140,6 +140,42 @@ depends on neither, and Quick Actions carries its own route rather than borrowin
   resend every image each turn or let history grow the payload as a chat goes on. The composer refuses a picture
   past the budget and says so, rather than letting send time drop it silently.
 
+## Assistants
+
+An **Assistant** is a named, dedicated AI chat bar with its own **shortcut, model, system prompt,
+Skills, MCP-server subset, web search, open policy, retention, per-display placement and width**. The
+model is `Assistant` (pure, `Codable`); `AssistantStore` persists the library as JSON in
+`UserDefaults`, and `SkillStore` holds imported Claude Agent Skills under
+`application-support/skills`. Both are backup-excluded, like every other AI key — an assistant bundles
+machine-local placement and references to this Mac's Skills and MCP servers, and a Skill is billed
+instruction content, so neither may arrive from another Mac's backup.
+
+- **The default bar is never an Assistant.** `PaletteState.activeAssistantID` names the one a summon is
+  scoped to, or `nil` for the default `toggleAIBar` bar and the full `AI Chat` window. With it nil,
+  every send path, the model, the prompt, the tools and the history query are byte-for-byte today's
+  behaviour — the regression firewall for the whole feature.
+- **An active Assistant re-points the stack, it does not fork it.** `AIChatCoordinator` reads
+  `activeAssistant` in four places: `effectiveProvider` (the assistant's `model`, else the global
+  default), `AIInstructions.compose` (its `systemPrompt` + enabled `Skills`), `MCPCoordinator.tools`
+  (scoped to its `mcpServerIDs`), and the open policy (`opensTo`/`newChatAfter`). Its glyph and tint
+  lead the bar and its `seedPrompt` is the placeholder.
+- **History is scoped by assistant.** `ChatHistoryStore` carries a `scope: UUID?` and stamps each
+  conversation's `assistant_id`; `load`/`save` filter on it, so each assistant has its own
+  conversations and the default bar's stay separate. An `ephemeral` assistant never writes to disk.
+  The column is added by a NULL-preserving `ALTER TABLE`, so a database that predates it migrates its
+  rows to the default scope.
+- **Each Assistant is also a launcher command.** `AppEntry.Kind.assistant` publishes an "Ask <Name>"
+  row through `AppIndex.setAssistants`, gated by the AI feature through `settingsOwner = .ai` (no
+  `VisibilityStore` category — it mirrors `customCommand`). `aiAssistantsShowInLauncher` toggles the
+  rows; launching one calls `openAssistant(id:)`, the same path its per-assistant hotkey
+  (`HotKeyAction.assistant(id:)`) takes.
+- **Skills inject instructions, never code.** `AIInstructions.compose(skills:)` appends each enabled
+  Skill's body within a per-turn byte budget (smaller on device); bundled scripts are never run. A
+  `SKILL.md` with no `---` frontmatter naming a `name` is rejected at import.
+
+Settings → AI hosts the **Assistants** list (add/edit/remove, with the editor sheet) and the **Skills**
+library (import/enable/remove); see [the Settings section](#settings-and-backup-boundary).
+
 ## Connections and routing
 
 `AIModelSelection` has five cases: `.appleIntelligence`, `.codex`, `.claude`, `.openCode` and `.api`.

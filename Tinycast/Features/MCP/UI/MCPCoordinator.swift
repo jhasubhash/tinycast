@@ -47,12 +47,14 @@ final class MCPCoordinator {
         return store.enabledServers.first { $0.slug == slug }
     }
 
-    /// What this turn may reach: everything enabled, or one server when `@slug` named it.
-    func tools(scopedTo slug: String?) -> [AITool] {
+    /// What this turn may reach: everything enabled, one server when `@slug` names it, and — when an
+    /// Assistant is active — only the servers it enabled (`allowed`). Nil `allowed` is the default bar.
+    func tools(scopedTo slug: String?, allowed: Set<UUID>? = nil) -> [AITool] {
         guard isActive else { return [] }
         return manager.tools
             .filter { tool in
                 guard slug == nil || tool.serverSlug == slug else { return false }
+                guard allowed == nil || allowed?.contains(tool.serverID) == true else { return false }
                 return store.server(id: tool.serverID)?.trust != .never
             }
             .map(\.aiTool)

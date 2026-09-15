@@ -38,6 +38,8 @@ struct AISettingsView: View {
                 .settingsEnabled(appSettings.aiEnabled)
 
             Group {
+                AssistantsSettingsSection()
+                SkillsSettingsSection()
                 defaultModelSection
                 chatSection
                 conversationsSection

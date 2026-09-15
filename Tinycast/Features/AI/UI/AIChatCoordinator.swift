@@ -28,6 +28,7 @@ final class AIChatCoordinator {
 
     func applyEnabled() {
         appIndex.setCommandsVisible([.aiChat], settings.aiEnabled)
+        applyAssistantsPresence()
         guard settings.aiEnabled else {
             // Before the handle closes: cancelling an open reply saves the conversation it ends.
             chat.startNewChat()
@@ -45,6 +46,12 @@ final class AIChatCoordinator {
         }
     }
 
+    /// The assistants' "Ask <Name>" launcher rows: present only with AI on and the launcher toggle set.
+    func applyAssistantsPresence() {
+        let visible = settings.aiEnabled && settings.aiAssistantsShowInLauncher
+        appIndex.setAssistants(visible ? core.assistants.assistants : [])
+    }
+
     func applyRetention() {
         guard settings.aiEnabled,
             let cutoff = core.aiSettings.retention.cutoff(from: Date())
@@ -59,8 +66,11 @@ final class AIChatCoordinator {
             paletteCoordinator.hidePalette()
             return
         }
+        // The default bar and full window are never an assistant, whatever a prior summon left.
+        palette.activeAssistantID = nil
+        switchScope(to: nil, ephemeral: false)
         applyOpenPolicy()
-        // The launcher command is the full window, never the bar, whatever a prior summon left.
+        // The launcher command is the full window, never the bar.
         palette.aiBar = false
         paletteCoordinator.showPalette(mode: .ai)
     }
@@ -73,11 +83,42 @@ final class AIChatCoordinator {
             paletteCoordinator.hidePalette()
             return
         }
+        palette.activeAssistantID = nil
+        switchScope(to: nil, ephemeral: false)
         applyOpenPolicy()
         palette.aiBar = true
         // Resume opens straight to the transcript; a fresh chat opens as the composer alone.
         palette.aiBarExpanded = !chat.session.messages.isEmpty
         paletteCoordinator.showPalette(mode: .ai)
+    }
+
+    /// Summon a user-created Assistant as a chat bar, scoped to its model, prompt, skills and MCP set.
+    func openAssistant(id: UUID) {
+        guard settings.aiEnabled, let assistant = core.assistants.assistant(id: id) else { return }
+        // A second press of the same assistant's chord closes it.
+        if paletteCoordinator.isShowing(.ai), palette.aiBar, palette.activeAssistantID == id {
+            paletteCoordinator.hidePalette()
+            return
+        }
+        // Set the scope before the policy runs, so it reads this assistant's `opens to`.
+        palette.activeAssistantID = id
+        switchScope(to: id, ephemeral: assistant.ephemeral)
+        applyOpenPolicy()
+        palette.aiBar = true
+        palette.aiBarExpanded = !chat.session.messages.isEmpty
+        paletteCoordinator.showPalette(mode: .ai)
+    }
+
+    /// Remove an Assistant: close its bar if open, drop its shortcut, delete its scoped conversations
+    /// and the record itself. The Skills it referenced stay in the library.
+    func removeAssistant(id: UUID) {
+        if palette.activeAssistantID == id {
+            palette.activeAssistantID = nil
+            if paletteCoordinator.isShowing(.ai), palette.aiBar { paletteCoordinator.hidePalette() }
+        }
+        core.hotKeys.setBinding(nil, for: .assistant(id: id))
+        core.chatHistory.deleteScope(id)
+        core.assistants.remove(id: id)
     }
 
     /// ⇥ and the AI fallback: a fresh chat that carries the question, already asked.
@@ -88,9 +129,19 @@ final class AIChatCoordinator {
             showChat()
             return
         }
+        palette.activeAssistantID = nil
+        switchScope(to: nil, ephemeral: false)
         chat.startNewChat()
         paletteCoordinator.showPalette(mode: .ai)
         send(prompt)
+    }
+
+    /// Point the history store at a scope; a real change drops the now-foreign resident transcript so
+    /// the open policy starts the new scope clean.
+    private func switchScope(to id: UUID?, ephemeral: Bool) {
+        let changed = core.chatHistory.scope != id
+        core.chatHistory.setScope(id, ephemeral: ephemeral)
+        if changed { chat.startNewChat() }
     }
 
     /// A file pasted at the launcher belongs in chat, never in a search for its name.
@@ -110,8 +161,10 @@ final class AIChatCoordinator {
         let hasStaging = !chat.pendingAttachments.isEmpty
         // From history when nothing is resident, so the verdict still holds after a relaunch.
         let lastActiveAt = hasTranscript ? chat.session.updatedAt : recent?.updatedAt
+        let assistant = activeAssistant
         let decision = AIConversationOpenPolicy.decide(
-            opensTo: core.aiSettings.opensTo, newAfter: core.aiSettings.newChatAfter,
+            opensTo: assistant?.opensTo ?? core.aiSettings.opensTo,
+            newAfter: assistant?.newChatAfter ?? core.aiSettings.newChatAfter,
             lastActiveAt: lastActiveAt, now: Date())
         switch decision {
         case .resume:
@@ -130,14 +183,22 @@ final class AIChatCoordinator {
     func send(_ input: String) -> Bool {
         guard settings.aiEnabled else { return false }
         do {
-            let webSearch = core.aiSettings.webSearchEnabled && capabilities.webSearch
+            let assistant = activeAssistant
+            let webSearch =
+                (assistant?.webSearch ?? core.aiSettings.webSearchEnabled) && capabilities.webSearch
             let address = MCPComposerAddress.parse(input, slugs: core.mcpCoordinator.slugs)
+            let skills = assistant.map { core.skills.enabledSkills(ids: $0.skillIDs) } ?? []
+            let skillBudget =
+                effectiveModel?.isOnDevice == true ? AISkillBudget.onDevice : AISkillBudget.default
             let sent = chat.send(
-                address.rest, using: try toolAware(core.aiProvider(), scopedTo: address.slug),
+                address.rest,
+                using: try toolAware(
+                    effectiveProvider(), scopedTo: address.slug, allowed: assistant?.mcpServerIDs),
                 webSearch: webSearch,
                 instructions: AIInstructions.compose(
-                    userPrompt: core.aiSettings.systemPrompt,
-                    isEnabled: core.aiSettings.systemPromptEnabled),
+                    userPrompt: assistant?.systemPrompt ?? core.aiSettings.systemPrompt,
+                    skills: skills, skillBudget: skillBudget,
+                    isEnabled: assistant?.systemPromptEnabled ?? core.aiSettings.systemPromptEnabled),
                 contextBudget: contextBudget)
             // The first message grows the bar past its composer into the transcript.
             if sent { palette.aiBarExpanded = true }
@@ -149,8 +210,10 @@ final class AIChatCoordinator {
     }
 
     /// Only chat wraps a route in the tool loop; a text rewrite has nothing to call.
-    private func toolAware(_ provider: any AIProvider, scopedTo slug: String?) -> any AIProvider {
-        let tools = core.mcpCoordinator.tools(scopedTo: slug)
+    private func toolAware(
+        _ provider: any AIProvider, scopedTo slug: String?, allowed: Set<UUID>? = nil
+    ) -> any AIProvider {
+        let tools = core.mcpCoordinator.tools(scopedTo: slug, allowed: allowed)
         guard capabilities.tools, !tools.isEmpty else { return provider }
         let chatID = chat.session.id
         return AIToolLoopProvider(base: provider, tools: tools) { [mcp = core.mcpCoordinator] call in
@@ -206,9 +269,24 @@ final class AIChatCoordinator {
         Paster.copyPlainText(text)
     }
 
+    /// The Assistant this summon is scoped to, or nil for the default bar.
+    var activeAssistant: Assistant? {
+        palette.activeAssistantID.flatMap { core.assistants.assistant(id: $0) }
+    }
+
+    /// The model the summon uses: the assistant's, else the global default. The fall-through keeps
+    /// the default bar (`activeAssistant == nil`) byte-for-byte today's behaviour.
+    var effectiveModel: AIModelSelection? {
+        activeAssistant?.model ?? core.aiSettings.defaultModel
+    }
+
+    private func effectiveProvider() throws -> any AIProvider {
+        if let model = activeAssistant?.model { return try core.aiProvider(for: model) }
+        return try core.aiProvider()
+    }
     /// What the selected model can take; the footer offers only what applies.
     var capabilities: AIModelCapabilities {
-        switch core.aiSettings.defaultModel {
+        switch effectiveModel {
         case .appleIntelligence?: return .appleIntelligence
         case .codex?: return .codex
         case .claude?, .openCode?:
@@ -223,7 +301,7 @@ final class AIChatCoordinator {
 
     /// How much history the selected route can hold; the on-device window is far smaller.
     private var contextBudget: Int {
-        core.aiSettings.defaultModel?.isOnDevice == true
+        effectiveModel?.isOnDevice == true
             ? AppleIntelligence.contextBudget : ChatSession.defaultTextBudget
     }
 
@@ -436,7 +514,7 @@ final class AIChatCoordinator {
 
     /// Shortened here, not by layout: a flexible label would take the row from the search field.
     var selectedModelTitle: String {
-        guard let selected = core.aiSettings.defaultModel else { return "Choose Model" }
+        guard let selected = effectiveModel else { return "Choose Model" }
         let title = selectedModelOption?.title ?? selected.model
         guard title.count > Self.maxModelTitleLength else { return title }
         let keep = Self.maxModelTitleLength / 2
@@ -447,7 +525,7 @@ final class AIChatCoordinator {
 
     /// From the selection, not the loaded list: the list arrives after the picker first paints.
     var selectedModelIcon: PopoverMenuIcon {
-        switch core.aiSettings.defaultModel {
+        switch effectiveModel {
         case .appleIntelligence?: return AIModelOption.appleIntelligenceIcon
         case .codex?: return .asset(AIBrand.openAI.assetName)
         case .claude?: return .asset(AIBrand.claude.assetName)
@@ -479,33 +557,42 @@ final class AIChatCoordinator {
     }
 
     private var selectedModelOption: AIModelOption? {
-        guard let selected = core.aiSettings.defaultModel else { return nil }
+        guard let selected = effectiveModel else { return nil }
         return modelOptions.first { $0.matches(selected) }
     }
 
     func selectModel(_ option: AIModelOption) {
-        core.aiSettings.select(
+        applyModelSelection(
             AIModelOption.withDefaultEffort(
                 option.selection, settings: core.aiSettings,
                 subscription: core.chatGPTSubscription, installedAI: core.installedAI))
     }
 
+    /// A live model choice writes to the active Assistant, or to the global default for the bar.
+    private func applyModelSelection(_ selection: AIModelSelection) {
+        if let assistant = activeAssistant {
+            core.assistants.setModel(selection, for: assistant.id)
+        } else {
+            core.aiSettings.select(selection)
+        }
+    }
+
     var reasoningEfforts: [ChatGPTSubscription.Effort] {
         AIModelOption.efforts(
-            for: core.aiSettings.defaultModel, settings: core.aiSettings,
+            for: effectiveModel, settings: core.aiSettings,
             subscription: core.chatGPTSubscription, installedAI: core.installedAI)
     }
 
     var selectedReasoningTitle: String {
-        guard let selected = core.aiSettings.defaultModel?.effort,
+        guard let selected = effectiveModel?.effort,
             let effort = reasoningEfforts.first(where: { $0.id == selected })
         else { return "Reasoning" }
         return effort.title
     }
 
     func selectReasoningEffort(_ effort: ChatGPTSubscription.Effort) {
-        guard let selection = core.aiSettings.defaultModel else { return }
-        core.aiSettings.select(selection.withEffort(effort.id))
+        guard let selection = effectiveModel else { return }
+        applyModelSelection(selection.withEffort(effort.id))
     }
 
     @discardableResult

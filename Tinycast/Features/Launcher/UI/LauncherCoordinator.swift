@@ -100,6 +100,11 @@ final class LauncherCoordinator {
             customCommandCoordinator.runCustomCommand(id: id)
             return
         }
+        if app.kind == .assistant {
+            guard let id = Assistant.id(fromEntryID: app.id) else { return }
+            core.aiChatCoordinator.openAssistant(id: id)
+            return
+        }
         if app.kind == .systemAction {
             guard let action = SystemActionCatalog.action(forEntryID: app.id) else { return }
             systemActionCoordinator.runSystemAction(id: action.id)
@@ -147,8 +152,8 @@ final class LauncherCoordinator {
         case .snippet:
             let snippetID = String(app.id.dropFirst("snippet:".count))
             snippetCoordinator.expandSnippet(id: snippetID, target: previous)
-        case .command, .quickAction, .customCommand, .systemAction, .windowCommand, .windowLayout,
-            .quicklink, .extensionCommand, .plugin, .meeting:
+        case .command, .quickAction, .customCommand, .assistant, .systemAction, .windowCommand,
+            .windowLayout, .quicklink, .extensionCommand, .plugin, .meeting:
             break  // handled above
         }
     }

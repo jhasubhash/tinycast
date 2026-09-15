@@ -482,7 +482,10 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         core.palette.aiBarGrowsUp = growsUp
         // Growing up keeps the bar's bottom edge fixed; every other placement keeps its top.
         let originY = growsUp ? anchor.y - size.compactHeight : anchor.y - height
-        let frame = NSRect(x: anchor.x, y: originY, width: size.panelWidth, height: height)
+        // An active Assistant may pin its own width; otherwise the shared one.
+        let width = core.palette.activeAssistantID
+            .flatMap { core.assistants.assistant(id: $0)?.width } ?? size.panelWidth
+        let frame = NSRect(x: anchor.x, y: originY, width: width, height: height)
         guard animated else {
             panel.setFrame(frame, display: true)
             return
@@ -515,14 +518,20 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         return resolved
     }
 
-    /// The AI bar keeps its own placement, so dragging one never moves the launcher's, or the reverse.
+    /// Each surface keeps its own placement: an active Assistant's own, else the AI bar's, else the
+    /// launcher's, so dragging one never moves another.
     private func storedPosition(on display: String) -> CGPoint? {
-        core.palette.aiBar
+        if let id = core.palette.activeAssistantID {
+            return core.assistants.assistant(id: id)?.position(on: display)
+        }
+        return core.palette.aiBar
             ? core.settings.aiBarPosition(on: display) : core.settings.palettePosition(on: display)
     }
 
     private func setStoredPosition(_ offset: CGPoint?, on display: String) {
-        if core.palette.aiBar {
+        if let id = core.palette.activeAssistantID {
+            core.assistants.setPosition(offset, for: id, on: display)
+        } else if core.palette.aiBar {
             core.settings.setAIBarPosition(offset, on: display)
         } else {
             core.settings.setPalettePosition(offset, on: display)

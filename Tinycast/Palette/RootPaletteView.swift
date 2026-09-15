@@ -658,6 +658,12 @@ struct RootPaletteView: View {
             // Every sub-screen leaves the same way, so the slot reads the same on all of them.
             if vm.mode != .launcher, !vm.aiBar {
                 HeaderBackButton(help: backHelp, action: goBack)
+            } else if vm.mode == .ai, let assistant = activeAssistant {
+                AssistantGlyph(symbol: assistant.symbol, tint: assistant.tint)
+                    .font(metrics.typography.headerIcon)
+                    .frame(width: metrics.size.headerIconSlot)
+                    .contentShape(Rectangle())
+                    .windowDraggable(settings.paletteDraggable, onBegan: beginDrag, onEnded: endDrag)
             } else {
                 Image(systemName: vm.mode.systemImage)
                     .font(metrics.typography.headerIcon)
@@ -815,6 +821,11 @@ struct RootPaletteView: View {
             max(metrics.size.panelWidth - accessory.width - chrome, metrics.scaled(60)))
     }
 
+    /// The Assistant the AI bar is scoped to, or nil for the default bar and full window.
+    private var activeAssistant: Assistant? {
+        vm.activeAssistantID.flatMap { core.assistants.assistant(id: $0) }
+    }
+
     /// In the argument form the field is that argument's input, so it names the argument.
     private var searchPrompt: String {
         // Squeezed to the caret, the field has no room for a prompt; beside one it keeps it.
@@ -825,6 +836,10 @@ struct RootPaletteView: View {
         // Inside a running command the search bar belongs to the extension.
         if vm.mode == .extensionCommand, let placeholder = extensionScreen.searchPlaceholder {
             return placeholder
+        }
+        // An assistant's seed prompt is its own nudge, shown until the composer holds text.
+        if vm.mode == .ai, let seed = activeAssistant?.seedPrompt, !seed.isEmpty {
+            return seed
         }
         return vm.mode.placeholder
     }

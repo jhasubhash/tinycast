@@ -1,7 +1,7 @@
 import Foundation
 
 /// What summoning AI Chat lands on, decided at open time rather than when the palette hides.
-enum AIOpensTo: Int, CaseIterable, Identifiable, Sendable {
+enum AIOpensTo: Int, Codable, CaseIterable, Identifiable, Sendable {
     case recent = 0
     case newConversation = 1
 
@@ -16,7 +16,7 @@ enum AIOpensTo: Int, CaseIterable, Identifiable, Sendable {
 }
 
 /// Minutes as the raw value, `never` negative so it cannot collide with the 0 an unset key reads.
-enum AINewChatAfter: Int, CaseIterable, Identifiable, Sendable {
+enum AINewChatAfter: Int, Codable, CaseIterable, Identifiable, Sendable {
     case twoMinutes = 2
     case fiveMinutes = 5
     case tenMinutes = 10

@@ -121,6 +121,15 @@ enum SettingsBackupCoverage {
         AppSettingsKey.aiNewChatAfter.rawValue:
             "Paces the same decision as the setting it accompanies, against conversations that stay "
             + "on the Mac that had them.",
+        AppSettingsKey.aiAssistants.rawValue:
+            "An assistant bundles a prompt, a model destination, machine-local placement and a "
+            + "reference to skills and MCP servers this Mac has; an import must not arrive carrying one.",
+        AppSettingsKey.aiSkills.rawValue:
+            "A skill is instruction content the model is billed for and a destination for chat context, "
+            + "imported from files on this Mac; a backup must not carry it onto another.",
+        AppSettingsKey.aiAssistantsShowInLauncher.rawValue:
+            "A launcher-visibility toggle for the backup-excluded assistants; showing rows for "
+            + "assistants a backup never carries would mean nothing on another Mac.",
         AppSettingsKey.mcpEnabled.rawValue:
             "Doubles as consent to run third-party MCP servers, one of which is a local process; a "
             + "flag that grants a capability is never carried by a backup.",

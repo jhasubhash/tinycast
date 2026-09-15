@@ -7,6 +7,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case command
         case quickAction
         case customCommand
+        case assistant
         case snippet
         case systemAction
         case windowCommand
@@ -42,6 +43,11 @@ struct AppEntry: Identifiable, Hashable, Sendable {
                 return KindDescriptor(
                     label: "Custom Command", sectionTitle: "Custom Commands",
                     openVerb: "Run Custom Command", canHideFromSearch: false,
+                    canRevealInFinder: false, isSymbolIcon: true)
+            case .assistant:
+                return KindDescriptor(
+                    label: "Assistant", sectionTitle: "Assistants",
+                    openVerb: "Open Assistant", canHideFromSearch: true,
                     canRevealInFinder: false, isSymbolIcon: true)
             case .snippet:
                 return KindDescriptor(
@@ -171,6 +177,8 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return bundleID.map { .settingsPane(bundleID: $0) }
         case .customCommand:
             return CustomCommand.id(fromEntryID: id).map { .customCommand(id: $0) }
+        case .assistant:
+            return Assistant.id(fromEntryID: id).map { .assistant(id: $0) }
         case .systemAction:
             return SystemActionCatalog.action(forEntryID: id).map { .systemAction(id: $0.id) }
         case .windowCommand:
@@ -207,6 +215,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case .quicklink: return Quicklink.sfSymbol
         case .snippet: return "text.quote"
         case .customCommand: return CustomCommand.sfSymbol
+        case .assistant: return "sparkles"
         case .command: return CommandCatalog.command(for: self)?.sfSymbol ?? "questionmark"
         case .quickAction:
             return CommandCatalog.command(for: self)?.sfSymbol ?? CustomQuickAction.sfSymbol
@@ -319,6 +328,7 @@ final class AppIndex {
 
     private var discoveredEntries: [AppEntry] = []
     private var customCommandEntries: [AppEntry] = []
+    private var assistantEntries: [AppEntry] = []
     private var windowCommandEntries: [AppEntry] = []
     private var windowLayoutEntries: [AppEntry] = []
     private var quicklinkEntries: [AppEntry] = []
@@ -382,6 +392,24 @@ final class AppIndex {
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         guard entries != customCommandEntries else { return }
         customCommandEntries = entries
+        publishEntries()
+    }
+
+    /// Replaces the assistant slice — each Assistant's "Ask <Name>" launcher command. The AI feature
+    /// gates it (nil `settingsOwner` would let a kind toggle steal it from AI's own switch).
+    func setAssistants(_ assistants: [Assistant]) {
+        let entries = assistants.map { assistant -> AppEntry in
+            let symbol =
+                NSImage(systemSymbolName: assistant.symbol, accessibilityDescription: nil) != nil
+                ? assistant.symbol : nil
+            return AppEntry(
+                id: assistant.entryID, name: "Ask \(assistant.name)",
+                url: URL(string: "tinycast://assistant/" + assistant.id.uuidString)!,
+                bundleID: nil, kind: .assistant, settingsOwner: .ai, symbolName: symbol)
+        }
+        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        guard entries != assistantEntries else { return }
+        assistantEntries = entries
         publishEntries()
     }
 
@@ -569,7 +597,7 @@ final class AppIndex {
                 extensionEntries + pluginEntries + quicklinkEntries + snippetEntries
                     + Self.systemActionEntries
                     + windowLayoutEntries + windowCommandEntries + customCommandEntries
-                    + quickActionEntries + commandEntries)
+                    + assistantEntries + quickActionEntries + commandEntries)
         guard updated != apps else { return }
         apps = updated
         entriesRevision &+= 1
