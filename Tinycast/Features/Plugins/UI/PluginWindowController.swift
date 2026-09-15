@@ -162,6 +162,18 @@ final class PluginWindowController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Persisted so the pop-outs a user leaves open reappear on the next launch; each window's size
+    /// and position ride the native per-window frame autosave. Kept in plain defaults, never a
+    /// settings backup — window geometry is machine-local, like the palette's own position.
+    private static let persistenceKey = "plugin.windows"
+    private var didRestore = false
+
+    private struct PersistedWindow: Codable {
+        var route: String
+        var allSpaces: Bool
+        var keepInFront: Bool
+    }
+
     init(core: AppCore) {
         self.core = core
     }
@@ -220,16 +232,51 @@ final class PluginWindowController: NSObject, NSWindowDelegate {
         windows[key] = Entry(panel: panel, plugin: plugin)
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        persist()
     }
 
     func close(key: String) {
         guard let entry = windows.removeValue(forKey: key) else { return }
         entry.panel.orderOut(nil)
         entry.panel.close()
+        persist()
     }
 
     func closeAll() {
         for key in Array(windows.keys) { close(key: key) }
+    }
+
+    /// Reopen the pop-outs saved from last launch, once the plugin catalog has loaded. Frame autosave
+    /// restores each window's size and position; the saved flags restore its space and level options.
+    func restoreWindows() {
+        guard !didRestore else { return }
+        didRestore = true
+        for saved in loadPersisted() {
+            guard let route = PluginRouteURL.decode(saved.route),
+                let install = core.plugins.install(forIdentifier: route.identifier)
+            else { continue }
+            open(install: install, route: PluginRoute(payload: route.payload, title: ""))
+            if saved.allSpaces { setShowsOnAllSpaces(true, key: saved.route) }
+            if saved.keepInFront { setKeepsInFront(true, key: saved.route) }
+        }
+        persist()
+    }
+
+    private func persist() {
+        let items = windows.map { key, entry in
+            PersistedWindow(
+                route: key,
+                allSpaces: entry.panel.collectionBehavior.contains(.canJoinAllSpaces),
+                keepInFront: entry.panel.level == .floating)
+        }
+        UserDefaults.standard.set(try? JSONEncoder().encode(items), forKey: Self.persistenceKey)
+    }
+
+    private func loadPersisted() -> [PersistedWindow] {
+        guard let data = UserDefaults.standard.data(forKey: Self.persistenceKey),
+            let items = try? JSONDecoder().decode([PersistedWindow].self, from: data)
+        else { return [] }
+        return items
     }
 
     // MARK: - The window's ⌘K commands
@@ -266,10 +313,12 @@ final class PluginWindowController: NSObject, NSWindowDelegate {
             panel.collectionBehavior.remove(.canJoinAllSpaces)
             panel.collectionBehavior.insert(.moveToActiveSpace)
         }
+        persist()
     }
 
     private func setKeepsInFront(_ on: Bool, key: String) {
         windows[key]?.panel.level = on ? .floating : .normal
+        persist()
     }
 
     // MARK: - NSWindowDelegate

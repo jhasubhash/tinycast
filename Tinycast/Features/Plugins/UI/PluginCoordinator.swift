@@ -35,6 +35,7 @@ final class PluginCoordinator {
             self?.palette.query = ""
             self?.palette.selection = 0
         }
+        plugins.onDidRefresh = { [weak self] in self?.core.pluginWindowController.restoreWindows() }
     }
 
     // MARK: - Feature presence
