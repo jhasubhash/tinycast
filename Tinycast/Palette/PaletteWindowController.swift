@@ -358,6 +358,9 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             if core.palette.mode == .ai, core.aiChatCoordinator.removeLastAttachment() {
                 return true
             }
+            // The dedicated bar is its own root, not a step off the launcher: an empty backspace
+            // stays in it rather than falling back to the command bar.
+            if core.palette.aiBar { return true }
             if core.palette.pop() { return true }
             guard core.palette.mode != .launcher else { return false }
             core.palette.prepare(mode: .launcher)
