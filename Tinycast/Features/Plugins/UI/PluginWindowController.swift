@@ -317,6 +317,7 @@ private struct PluginWindowChrome<Content: View>: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.metrics) private var metrics
     @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         menu: PluginWindowMenu,
@@ -351,9 +352,12 @@ private struct PluginWindowChrome<Content: View>: View {
                     PluginWindowPalette(menu: menu, commands: commands())
                         .padding(.trailing, 12)
                         .padding(.bottom, 56)
-                        .transition(.opacity)
+                        .transition(
+                            .scale(scale: 0.96, anchor: .bottomTrailing).combined(with: .opacity))
                 }
             }
+            // The same subtle scale-and-fade the launcher's own ⌘K menu closes with.
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: menu.open)
             .onHover { hovering = $0 }
     }
 
