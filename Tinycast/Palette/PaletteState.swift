@@ -48,6 +48,10 @@ final class PaletteState {
     var aiBarExpanded = false
     /// The bar is placed low, so it grows upward and docks its composer at the bottom.
     var aiBarGrowsUp = false
+    /// The AI composer's font size and its wrapped height beyond the header's one-line base — the
+    /// field reads the former, the bar and header grow by the latter, so all three stay in agreement.
+    var aiComposerFontSize: CGFloat = 16
+    var aiComposerExtraHeight: CGFloat = 0
     /// The paste target, mirrored on every show; `prepare` resets the screen, not this.
     var pasteTarget: PasteTarget?
     /// Values typed into a row's inline argument fields, keyed by `argumentKey`.
@@ -162,6 +166,8 @@ final class PaletteState {
             aiBar = false
             aiBarExpanded = false
             aiBarGrowsUp = false
+            aiComposerFontSize = 16
+            aiComposerExtraHeight = 0
         }
         dropHoverHighlight()
         menuOpen = false

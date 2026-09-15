@@ -474,7 +474,9 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     private func positionPanel(_ panel: NSPanel, collapsed: Bool, animated: Bool = false) {
         guard let anchor = resolveAnchor() else { return }
         let size = metrics.size
-        let height = collapsed ? size.compactHeight : size.panelHeight
+        // The AI composer grows the collapsed bar until it hits its scroll threshold; else 0.
+        let height =
+            collapsed ? size.compactHeight + core.palette.aiComposerExtraHeight : size.panelHeight
         let growsUp = growsUpward(anchor: anchor)
         // The view docks the composer at the bottom when the bar grows up, so publish the direction.
         core.palette.aiBarGrowsUp = growsUp

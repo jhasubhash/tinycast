@@ -101,7 +101,9 @@ depends on neither, and Quick Actions carries its own route rather than borrowin
   beside the model name and no Send pill; placed high or centred it grows down with the normal footer.
   `AIChatCoordinator.toggleBar` is the whole entry point; `showChat` — the launcher command — stays the
   full window. Its actions carry shortcuts: New Chat `⌘N`, Copy Last Response `⇧⌘C`, Chat History `⌘Y`,
-  AI Settings `⌘,`.
+  AI Settings `⌘,`. The composer is multi-line where the launcher's field is not: it wraps, shrinks its
+  font once wrapped, grows the bar to a six-line cap then scrolls, takes ⇧↵ for a line break, and can be
+  dragged by its glyph — all measured off the one shared field, which every other mode keeps single-line.
 - **Arriving with a question skips the open policy entirely.** `ask(_:)` — ⇥ from the launcher, and
   the AI fallback row — always starts a new chat and submits the text, because a question asked
   outright is not a summon: resuming a transcript to append an unrelated line to it would be the one
