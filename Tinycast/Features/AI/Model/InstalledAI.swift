@@ -92,12 +92,13 @@ struct InstalledAIModel: Equatable, Identifiable, Sendable {
     }
 
     static let claude: [InstalledAIModel] = [
-        InstalledAIModel(id: "sonnet", name: "Claude Sonnet", efforts: claudeEfforts),
-        InstalledAIModel(id: "opus", name: "Claude Opus", efforts: claudeEfforts),
+        InstalledAIModel(id: "sonnet", name: "Claude Sonnet", efforts: cliEfforts),
+        InstalledAIModel(id: "opus", name: "Claude Opus", efforts: cliEfforts),
         InstalledAIModel(id: "haiku", name: "Claude Haiku")
     ]
 
-    private static let claudeEfforts = ["low", "medium", "high", "xhigh", "max"].map {
+    /// The `--effort` / `--reasoning-effort` ladder the Claude and Copilot CLIs both accept.
+    private static let cliEfforts = ["low", "medium", "high", "xhigh", "max"].map {
         ChatGPTSubscription.Effort(id: $0, detail: nil)
     }
 
@@ -143,7 +144,9 @@ struct InstalledAIModel: Equatable, Identifiable, Sendable {
         }
         // A couple of well-known ones stay present even on a fresh install.
         for id in ["claude-sonnet-5", "claude-opus-4.8"] where !ids.contains(id) { ids.append(id) }
-        return ids.map { InstalledAIModel(id: $0, name: $0 == "auto" ? "Auto" : $0) }
+        return ids.map {
+            InstalledAIModel(id: $0, name: $0 == "auto" ? "Auto" : $0, efforts: cliEfforts)
+        }
     }
 
     /// `~/.copilot/config.json` is JSONC — leading `//` comments — so parse from the first `{`.
