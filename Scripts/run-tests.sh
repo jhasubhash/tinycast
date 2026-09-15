@@ -437,7 +437,9 @@ run support-test           Tinycast/Features/Support/Model/*.swift
 run ai-provider-test       Tinycast/Features/Settings/AppSettingsKey.swift \
                            Tinycast/Features/AI/Model/*.swift \
                            Tinycast/Features/AI/Settings/AISettingsStore.swift
-run assistant-test         Tinycast/Features/AI/Model/*.swift
+run assistant-test         Tinycast/Features/AI/Model/*.swift \
+                           Tinycast/Features/AI/Service/AssistantSecretStore.swift \
+                           Tinycast/Platform/KeychainSecretStore.swift
 run ai-chat-test           Tinycast/Features/AI/Model/AIRequest.swift \
                            Tinycast/Features/AI/Model/AIAttachmentPolicy.swift \
                            Tinycast/Features/AI/Model/AIRetention.swift \

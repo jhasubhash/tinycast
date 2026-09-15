@@ -81,8 +81,8 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
 ### `Skill`
 
 Parsed from a Claude Agent Skill. A skill's **body** is instruction text; a skill *folder* may bundle
-resources, but Tinycast's routes cannot execute bundled scripts (see §6.3), so v1 uses the instruction
-text only.
+resources. Tinycast copies the whole folder on import, so an assistant with **Allow shell tools** on
+can execute a bundled script itself (see §6.3); everywhere else v1 uses the instruction text only.
 
 ```swift
 struct Skill: Identifiable, Codable, Sendable, Equatable {
@@ -113,8 +113,8 @@ A skill is a folder whose entry point is `SKILL.md`:
 ```
 skill-name/
   SKILL.md          ← required: YAML frontmatter + markdown body
-  reference.md      ← optional bundled resources (not executed; may be inlined if referenced)
-  scripts/…         ← optional; NOT run by Tinycast (sandbox), see §6.3
+  reference.md      ← optional bundled resources (not executed unless referenced by a script)
+  scripts/…         ← optional; runs only on a CLI route with Allow shell tools on, see §6.3
 ```
 
 `SKILL.md`:
@@ -157,17 +157,22 @@ preamble
 + "# Skills\n" + for each enabled skill: "## <name>\n<instructions>"   (bounded)
 ```
 
-- One **skills budget** (`AISkillBudget`, e.g. ~16 KB) caps the injected total; skills are added
-  newest/most-relevant first until it fills, then a line notes the rest were omitted. On Apple
-  Intelligence the budget is far smaller (its context holds a prompt + reply together).
-- Injected every turn ⇒ **billed every turn**, exactly like the system prompt. The editor states this.
+- One **skills budget** (`AISkillBudget`) caps the injected total, sized per route: ~16 KB on an API
+  route (billed per turn, like the system prompt), ~2 KB on Apple Intelligence (its context holds a
+  prompt + reply together), and ~100 KB on an installed CLI route (Claude/Codex/OpenCode/Copilot ride a
+  paid subscription, not per-token billing, and open a much larger context). Skills are added in library
+  order until the budget fills, then a line notes the rest were omitted.
 
-### 6.3 What skills can't do (v1)
+### 6.3 What skills can and can't do
 
-Bundled **scripts are not executed** — the API/Apple-Intelligence routes have no execution surface, and
-the Claude/OpenCode/Codex CLI routes run sandboxed with tools disabled per the AI invariants. So a skill
-contributes its **instructions** only. Documented as a known limitation; native skill execution on the
-CLI routes is a possible later phase.
+A skill's **instructions** are all that reach an API or Apple Intelligence route — neither has an
+execution surface, so a bundled script is inert text there. An installed CLI route with **Allow shell
+tools** on is different: the assistant already grants that route full native shell + file access (§
+"Per-assistant CLI shell tools" in `CUSTOM.md`), so it can run a bundled script itself. Because a
+skill's body typically invokes its scripts by a path relative to its own folder (e.g.
+`./scripts/foo.py`), the injected block also names that folder's absolute path in this case
+(`AIInstructions.compose(allowsSkillScripts:)`) so the model can `cd` there before running one. With
+shell tools off, a skill contributes its **instructions** only, exactly as on the API/on-device routes.
 
 ## 7. Runtime routing — one active assistant re-points the existing stack
 
@@ -281,8 +286,9 @@ Two new sections plus one editor sheet:
   and history query is byte-for-byte today's behaviour. This is the regression firewall.
 - **Assistants, Skills and every new key are backup-excluded**, like all AI state — an import can never
   arm an assistant, a skill (instruction content) or a tool set it cannot configure.
-- **Skills contribute instructions, never execution.** No bundled script runs; the routes have no
-  execution surface. MCP tools remain API-routes-only.
+- **Skills contribute instructions by default; execution is opt-in per assistant.** A bundled script
+  runs only on an installed CLI route whose assistant has Allow shell tools on (§6.3); every other
+  route/setting stays instructions-only, with no execution surface. MCP tools remain API-routes-only.
 - **`assistant_id` is additive and NULL-preserving.** The migration never rewrites an existing chat's
   attribution; NULL is the default bar forever.
 - **One `AIChatState`, re-pointed.** Only one assistant is live at a time; switching saves then re-scopes.

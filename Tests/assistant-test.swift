@@ -28,7 +28,11 @@ struct AssistantTests {
 
         composeInjectsEnabledSkills()
         composeTrimsSkillsPastTheBudget()
+        composeNamesSkillFolderOnlyWhenScriptsAreAllowed()
+        cliSkillBudgetFitsRealisticSkills()
         composeWithoutSkillsIsPreambleAndPrompt()
+        environmentParsesQuotedAndBareValues()
+        environmentFormatNeverReQuotes()
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
     }
@@ -183,9 +187,70 @@ struct AssistantTests {
         expect(composed.utf8.count < AIPreamble.text.utf8.count + 5_000, "the budget caps the injected total")
     }
 
+    static func composeNamesSkillFolderOnlyWhenScriptsAreAllowed() {
+        let skill = Skill(
+            name: "slack", instructions: "Run `./scripts/slack_search_messages.py`.",
+            sourcePath: "/tmp/skills/slack-integration")
+        let withScripts = AIInstructions.compose(
+            userPrompt: nil, skills: [skill], allowsSkillScripts: true, isEnabled: true)
+        expect(
+            withScripts?.contains("/tmp/skills/slack-integration") == true,
+            "shell tools on names the skill's own folder so a relative script path resolves")
+
+        let withoutScripts = AIInstructions.compose(
+            userPrompt: nil, skills: [skill], allowsSkillScripts: false, isEnabled: true)
+        expect(
+            withoutScripts?.contains("/tmp/skills/slack-integration") == false,
+            "shell tools off never leaks the on-disk path — there is no way to reach it")
+    }
+
+    static func cliSkillBudgetFitsRealisticSkills() {
+        // A real Claude Agent Skill with prerequisites, examples and a script reference routinely runs
+        // 20-30 KB; the API/on-device budgets exist to bound per-turn billing and context, not to fit
+        // one, but an installed CLI route (flat subscription, huge context) should carry it whole.
+        let realistic = String(repeating: "x", count: 30_000)
+        let skill = Skill(name: "slack", instructions: realistic)
+        let composed = AIInstructions.compose(
+            userPrompt: nil, skills: [skill], skillBudget: AISkillBudget.cli, isEnabled: true)
+        expect(
+            composed?.contains("omitted here for length") != true,
+            "a realistic skill fits the CLI budget whole rather than being dropped")
+        expect(
+            AISkillBudget.onDevice < AISkillBudget.default && AISkillBudget.default < AISkillBudget.cli,
+            "the three tiers widen from on-device to API to installed CLI")
+    }
+
     static func composeWithoutSkillsIsPreambleAndPrompt() {
         let composed = AIInstructions.compose(userPrompt: "Hi.", isEnabled: true)
         expect(composed == AIPreamble.text + "\n\n" + "Hi.", "no skills leaves the classic composition")
         expect(AIInstructions.compose(userPrompt: "x", isEnabled: false) == nil, "disabled carries nothing")
+    }
+
+    static func environmentParsesQuotedAndBareValues() {
+        let text = """
+            SLACK_BOT_TOKEN="xoxb-2155837701-h3dqw"
+            SLACK_TEAM_ID='E23RE8G4F'
+            SLACK_USER_TOKEN=xoxp-2155837701-f68375
+            LONE_QUOTE="unmatched
+            """
+        let parsed = AssistantSecretStore.parse(text)
+        expect(
+            parsed["SLACK_BOT_TOKEN"] == "xoxb-2155837701-h3dqw",
+            "a double-quoted value pasted from `export FOO=\"bar\"` has the quotes stripped")
+        expect(
+            parsed["SLACK_TEAM_ID"] == "E23RE8G4F", "a single-quoted value has the quotes stripped too")
+        expect(
+            parsed["SLACK_USER_TOKEN"] == "xoxp-2155837701-f68375",
+            "a bare, unquoted value is unaffected")
+        expect(
+            parsed["LONE_QUOTE"] == "\"unmatched",
+            "an unmatched leading quote is left alone rather than guessed at")
+    }
+
+    static func environmentFormatNeverReQuotes() {
+        let formatted = AssistantSecretStore.format(["SLACK_BOT_TOKEN": "xoxb-2155837701-h3dqw"])
+        expect(
+            formatted == "SLACK_BOT_TOKEN=xoxb-2155837701-h3dqw",
+            "the canonical form is always bare NAME=value, so re-opening the editor self-heals a quoted save")
     }
 }

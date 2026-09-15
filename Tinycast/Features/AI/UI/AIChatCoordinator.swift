@@ -189,8 +189,14 @@ final class AIChatCoordinator {
                 (assistant?.webSearch ?? core.aiSettings.webSearchEnabled) && capabilities.webSearch
             let address = MCPComposerAddress.parse(input, slugs: core.mcpCoordinator.slugs)
             let skills = assistant.map { core.skills.enabledSkills(ids: $0.skillIDs) } ?? []
-            let skillBudget =
-                effectiveModel?.isOnDevice == true ? AISkillBudget.onDevice : AISkillBudget.default
+            let skillBudget: Int
+            if effectiveModel?.isOnDevice == true {
+                skillBudget = AISkillBudget.onDevice
+            } else if effectiveModel?.source.installedKind != nil {
+                skillBudget = AISkillBudget.cli
+            } else {
+                skillBudget = AISkillBudget.default
+            }
             let sent = chat.send(
                 address.rest,
                 using: try toolAware(
@@ -199,6 +205,7 @@ final class AIChatCoordinator {
                 instructions: AIInstructions.compose(
                     userPrompt: assistant?.systemPrompt ?? core.aiSettings.systemPrompt,
                     skills: skills, skillBudget: skillBudget,
+                    allowsSkillScripts: assistant?.allowShellTools ?? false,
                     isEnabled: assistant?.systemPromptEnabled ?? core.aiSettings.systemPromptEnabled),
                 contextBudget: contextBudget)
             // The first message grows the bar past its composer into the transcript.

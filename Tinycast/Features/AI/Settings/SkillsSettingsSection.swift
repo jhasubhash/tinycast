@@ -35,7 +35,9 @@ struct SkillsSettingsSection: View {
         } header: {
             SettingsSectionHeader(.aiSkills)
         } footer: {
-            Text("A Skill is a `SKILL.md` — a name, a when-to-use summary and instructions. Its scripts are never run.")
+            Text(
+                "A Skill is a `SKILL.md` — a name, a when-to-use summary and instructions. Its scripts "
+                    + "run only for an assistant with shell tools enabled.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

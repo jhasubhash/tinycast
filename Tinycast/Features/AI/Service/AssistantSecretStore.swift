@@ -36,20 +36,29 @@ struct AssistantSecretStore: Sendable {
 
 extension AssistantSecretStore {
     /// Parse a `NAME=value` block (one per line) into an environment, the shape the editor field uses.
+    /// A value wrapped in matching quotes (`"…"` or `'…'`) — pasted straight from a shell `export`
+    /// line — has them stripped, mirroring `SkillFrontmatter`'s frontmatter values.
     static func parse(_ text: String) -> [String: String] {
         var result: [String: String] = [:]
         for line in text.split(whereSeparator: \.isNewline) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty, let equals = trimmed.firstIndex(of: "=") else { continue }
             let key = String(trimmed[..<equals]).trimmingCharacters(in: .whitespaces)
-            let value = String(trimmed[trimmed.index(after: equals)...])
+            var value = String(trimmed[trimmed.index(after: equals)...])
+                .trimmingCharacters(in: .whitespaces)
+            if value.count >= 2, let first = value.first, first == "\"" || first == "'",
+                value.last == first
+            {
+                value = String(value.dropFirst().dropLast())
+            }
             guard !key.isEmpty else { continue }
             result[key] = value
         }
         return result
     }
 
-    /// The reverse, sorted so the field is stable across opens.
+    /// The reverse, sorted so the field is stable across opens. Never re-quotes — the canonical form a
+    /// save round-trips to is bare `NAME=value`, which also cleans up a quoted paste on next open.
     static func format(_ environment: [String: String]) -> String {
         environment.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }
             .joined(separator: "\n")
