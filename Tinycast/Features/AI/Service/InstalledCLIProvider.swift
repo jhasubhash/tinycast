@@ -281,7 +281,7 @@ private final class InstalledCLITurnRunner {
         case .codex, .copilot:
             break
         }
-        // The assistant's own variables win, so a Skill's script (e.g. JIRA_TOKEN) can authenticate.
+        // The assistant's own variables win, so a Skill's script can authenticate with its own tokens.
         if let toolConfig {
             for (key, value) in toolConfig.environment { result[key] = value }
         }

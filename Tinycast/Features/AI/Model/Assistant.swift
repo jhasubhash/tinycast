@@ -24,11 +24,11 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
     var skillIDs: Set<UUID>
     /// Enabled MCP servers — a subset of the library. Tools offered on API routes only.
     var mcpServerIDs: Set<UUID>
-    /// Opt-in: let an installed Claude/OpenCode CLI route run this assistant's MCP servers as its own
-    /// tools (a generated `--mcp-config`). Off by default — it un-sandboxes native CLI tool execution.
+    /// Opt-in: let an installed CLI route run this assistant's MCP servers as its own tools (a
+    /// generated `--mcp-config`). Off by default — it un-sandboxes native CLI tool execution.
     var allowCLITools: Bool
-    /// A broader opt-in than `allowCLITools`: let a Claude/OpenCode CLI route run *shell* commands too,
-    /// so a script-based Skill (e.g. Jira's `jira_query.py`) can execute. Full native tool access.
+    /// A broader opt-in than `allowCLITools`: let an installed CLI route run *shell* commands too, so a
+    /// script-based Skill can execute. Full native tool access.
     var allowShellTools: Bool
     var opensTo: AIOpensTo
     var newChatAfter: AINewChatAfter

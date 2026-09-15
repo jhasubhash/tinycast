@@ -181,15 +181,15 @@ struct AssistantEditorSheet: View {
             Toggle(isOn: $draft.allowCLITools) {
                 Text("Allow MCP tools via CLI")
                 Text(
-                    "Let an installed Claude or Codex CLI model call the enabled MCP servers. Scoped to "
-                        + "those servers only — no shell or file access.")
+                    "Let an installed CLI model call the enabled MCP servers. Scoped to those servers "
+                        + "only — no shell or file access.")
             }
             Toggle(isOn: $draft.allowShellTools) {
                 Text("Allow shell tools (dangerous)")
                 Text(
-                    "Let a Claude CLI model run shell commands, so a script-based Skill (e.g. Jira's "
-                        + "jira_query.py) can execute. It runs arbitrary code with your CLI login's "
-                        + "privileges — enable only for assistants you trust.")
+                    "Let an installed CLI model run shell commands, so a script-based Skill can "
+                        + "execute. It runs arbitrary code with your CLI login's privileges — enable "
+                        + "only for assistants you trust.")
             }
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text("Environment").foregroundStyle(.secondary)
@@ -208,7 +208,7 @@ struct AssistantEditorSheet: View {
                     )
                     .overlay(alignment: .topLeading) {
                         if environmentText.isEmpty {
-                            Text("JIRA_TOKEN=…\nJIRA_URL=https://jira.corp.adobe.com")
+                            Text("API_TOKEN=…\nAPI_URL=https://example.com")
                                 .font(.system(.body, design: .monospaced))
                                 .foregroundStyle(.tertiary)
                                 .padding(Theme.Spacing.sm)
@@ -220,7 +220,7 @@ struct AssistantEditorSheet: View {
             Text("CLI tools")
         } footer: {
             Text(
-                "CLI tools apply to the Claude and Codex routes (API models always call tools). One "
+                "CLI tools apply to installed CLI routes (API models always call tools). One "
                     + "NAME=value per line; values are stored in your login Keychain and passed to the "
                     + "CLI so a Skill's script can authenticate.")
                 .font(.caption)

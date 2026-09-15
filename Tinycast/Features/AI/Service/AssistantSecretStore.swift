@@ -1,6 +1,6 @@
 import Foundation
 
-/// An assistant's environment variables — tokens a script-based Skill needs (e.g. `JIRA_TOKEN`) —
+/// An assistant's environment variables — tokens a script-based Skill needs (e.g. an API token) —
 /// held one Keychain item per assistant, never in `UserDefaults` or a backup. Mirrors `MCPSecretStore`.
 struct AssistantSecretStore: Sendable {
     private let keychain: KeychainSecretStore
