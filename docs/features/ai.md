@@ -91,6 +91,17 @@ depends on neither, and Quick Actions carries its own route rather than borrowin
   racing over the same state, and a verdict that still holds after a relaunch. A reply still
   streaming is never reset out from under the reader — it was asked for — and the transcript is
   saved regardless, so the old conversation is one ⌘K → Chat History away.
+- **The floating bar is the same chat, summoned as a bar.** A dedicated `toggleAIBar` hotkey
+  (Settings → AI → Floating bar) opens `.ai` as a compact composer that shares the launcher's chat and
+  history — never a second window or a second conversation. It carries its own per-display placement
+  (`AppSettings.aiBarPosition`, backup-excluded like the palette's own), stays collapsed to the
+  composer until the first message, then expands into the transcript, animated. Placed low it grows
+  **upward** and docks the composer at the bottom with the transcript above
+  (`PaletteState.aiBarGrowsUp`, applied by `RootPaletteView.composeAtBottom`), a keycap `Actions ⌘K`
+  beside the model name and no Send pill; placed high or centred it grows down with the normal footer.
+  `AIChatCoordinator.toggleBar` is the whole entry point; `showChat` — the launcher command — stays the
+  full window. Its actions carry shortcuts: New Chat `⌘N`, Copy Last Response `⇧⌘C`, Chat History `⌘Y`,
+  AI Settings `⌘,`.
 - **Arriving with a question skips the open policy entirely.** `ask(_:)` — ⇥ from the launcher, and
   the AI fallback row — always starts a new chat and submits the text, because a question asked
   outright is not a summon: resuming a transcript to append an unrelated line to it would be the one
@@ -106,6 +117,9 @@ depends on neither, and Quick Actions carries its own route rather than borrowin
   idle past `Start a new conversation after`; `A New Conversation` always starts fresh. There is no
   third setting for "immediately" because that *is* `A New Conversation` — two controls able to
   express one state would only ever disagree.
+  A chat the reader *deliberately* started — ⌘K → New Chat — is marked `startedFresh`, so closing and
+  reopening keeps that empty chat rather than resuming the last saved one over it; the first sent
+  message clears the mark.
 - **History is local and lazy.** Conversation summaries stay in memory while transcripts load from the
   system SQLite database only for the selected preview or opened chat. Empty chats are never saved.
 - **Retention is enforced only while AI is on.** `Keep conversations` prunes on the enable transition
