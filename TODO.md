@@ -138,3 +138,36 @@ linking `TinycastPluginKit.framework`.
 
 - Progressive-disclosure skills (inject name+description; model pulls the body via a tool) —
   API-routes-only, needs tool support.
+
+---
+
+# TODO — Codex CLI shell tools (per-assistant)
+
+Claude's **Allow shell tools** opt-in works: the `claude -p` route runs shell commands
+(`--dangerously-skip-permissions`) with the assistant's `AssistantSecretStore` environment, so a
+script-based Skill (e.g. Jira's `jira_query.py`) executes. **Codex does not** — its shell is disabled
+at the app-server *launch*, so a Codex assistant with a script Skill can't run it and improvises
+(e.g. browses the Jira web UI instead of using `$JIRA_TOKEN`).
+
+**Root cause:** `CodexAppServerClient.start()` launches one shared, long-lived `codex app-server` with
+`-c features.shell_tool=false` (plus `unified_exec`, `browser_use`, … all `=false`). A launch flag —
+no thread can re-enable the tool. The client is shared with the default Codex bar and every normal
+Codex assistant, so it must stay sandboxed.
+
+## Plan
+
+- [ ] Spawn a **dedicated, isolated `CodexAppServerClient`** for shell-tools assistants — launched
+      **with** `shell_tool` (and whatever `unified_exec` needs) enabled, a **`workspace-write`** (or
+      full-access) sandbox, and the assistant's **environment** merged into the process env.
+- [ ] Route a shell-tools Codex turn (`AICLIToolConfig.allowShell == true`) to that instance;
+      keep `activeAssistant == nil` and non-shell assistants on the existing sandboxed shared client.
+- [ ] Thread `thread/start` sandbox → `workspace-write`, `turn/start` sandboxPolicy → writable +
+      `networkAccess: true`, and `declineServerRequest` → **approve** command-execution requests only
+      for that instance.
+- [ ] Lifecycle: ephemeral per-turn or per-assistant; tear down cleanly; never leave an
+      un-sandboxed Codex process resident.
+- [ ] Verify with a real Codex login that a script Skill runs via shell + env, and the default bar
+      stays sandboxed. Update the editor's shell-tools footer (currently "Claude CLI only").
+
+**Risk:** a second, deliberately un-sandboxed `codex` process runs arbitrary shell with the user's
+login while such an assistant is active. Same accepted-risk posture as Claude's shell opt-in.

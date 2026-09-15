@@ -118,6 +118,7 @@ final class AIChatCoordinator {
         }
         core.hotKeys.setBinding(nil, for: .assistant(id: id))
         core.chatHistory.deleteScope(id)
+        try? AssistantSecretStore().remove(for: id)
         core.assistants.remove(id: id)
     }
 
@@ -281,15 +282,24 @@ final class AIChatCoordinator {
     }
 
     private func effectiveProvider() throws -> any AIProvider {
-        let assistant = activeAssistant
-        // The opt-in only builds a config when the assistant allows CLI tools and enables servers;
-        // nil keeps every other route (and the default bar) exactly as before.
-        let cliTools =
-            assistant?.allowCLITools == true
-            ? core.mcpCoordinator.cliToolConfig(allowed: assistant?.mcpServerIDs ?? [])
-            : nil
-        if let model = assistant?.model { return try core.aiProvider(for: model, cliTools: cliTools) }
+        let cliTools = activeAssistant.flatMap(cliToolConfig)
+        if let model = activeAssistant?.model {
+            return try core.aiProvider(for: model, cliTools: cliTools)
+        }
         return try core.aiProvider(cliTools: cliTools)
+    }
+
+    /// The CLI-tools payload for an assistant, or nil when it opts into neither MCP nor shell tools —
+    /// nil keeps every route (and the default bar) sandboxed exactly as before. Environment variables
+    /// ride along so a Skill's script can authenticate.
+    private func cliToolConfig(for assistant: Assistant) -> AICLIToolConfig? {
+        guard assistant.allowCLITools || assistant.allowShellTools else { return nil }
+        let servers =
+            assistant.allowCLITools
+            ? core.mcpCoordinator.cliServers(allowed: assistant.mcpServerIDs) : []
+        return AICLIToolConfig(
+            servers: servers, allowShell: assistant.allowShellTools,
+            environment: AssistantSecretStore().environment(for: assistant.id))
     }
     /// What the selected model can take; the footer offers only what applies.
     var capabilities: AIModelCapabilities {

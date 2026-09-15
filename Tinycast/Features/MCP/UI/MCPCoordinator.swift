@@ -61,12 +61,11 @@ final class MCPCoordinator {
     }
 
     /// The Assistant's enabled + allowed MCP servers (trust != never) as a neutral list a CLI route can
-    /// format for itself, or nil when none apply. Secrets are read from the Keychain at build time, so
-    /// they never touch UserDefaults or a backup.
-    func cliToolConfig(allowed: Set<UUID>) -> AICLIToolConfig? {
-        guard isActive else { return nil }
+    /// format for itself. Secrets are read from the Keychain here, so they never touch a backup.
+    func cliServers(allowed: Set<UUID>) -> [AICLIMCPServer] {
+        guard isActive else { return [] }
         let secrets = MCPSecretStore()
-        let servers = store.enabledServers
+        return store.enabledServers
             .filter { allowed.contains($0.id) && $0.trust != .never }
             .map { server -> AICLIMCPServer in
                 let secret = secrets.secrets(for: server.id)
@@ -81,8 +80,6 @@ final class MCPCoordinator {
                     slug: server.slug, transport: transport,
                     headerValue: secret.headerValue, environment: secret.environment)
             }
-        guard !servers.isEmpty else { return nil }
-        return AICLIToolConfig(servers: servers)
     }
 
     func invoke(_ call: AIToolCall, in chat: UUID) async -> AIToolResult {

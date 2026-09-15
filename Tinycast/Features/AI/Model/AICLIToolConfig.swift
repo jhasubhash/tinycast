@@ -19,15 +19,23 @@ struct AICLIMCPServer: Sendable, Equatable {
 /// servers; `nil` everywhere else keeps the CLI route sandboxed as before.
 struct AICLIToolConfig: Sendable, Equatable {
     var servers: [AICLIMCPServer]
+    /// Full native tool access (shell + file + MCP), for running a script-based Skill. When false the
+    /// CLI is scoped to just `servers` (an `mcp__<slug>` allowlist).
+    var allowShell: Bool
+    /// Environment variables injected into the CLI process — tokens a Skill's script needs.
+    var environment: [String: String]
     /// A tool turn is call → result → answer; one turn is never enough.
     var maxTurns: Int
 
-    init(servers: [AICLIMCPServer], maxTurns: Int = 25) {
+    init(
+        servers: [AICLIMCPServer], allowShell: Bool = false,
+        environment: [String: String] = [:], maxTurns: Int = 25
+    ) {
         self.servers = servers
+        self.allowShell = allowShell
+        self.environment = environment
         self.maxTurns = maxTurns
     }
-
-    /// `mcp__<slug>` per server — an allowlist, so only these tools run, not the CLI's built-ins.
     var allowedTools: [String] { servers.map { "mcp__\($0.slug)" } }
 
     /// Claude Code's `--mcp-config` payload: `{"mcpServers":{…}}` for the enabled servers.

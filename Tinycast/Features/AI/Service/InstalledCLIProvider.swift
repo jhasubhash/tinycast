@@ -165,9 +165,30 @@ private final class InstalledCLITurnRunner {
     private var arguments: [String] {
         switch kind {
         case .claude:
+            if let toolConfig, toolConfig.allowShell {
+                // Full native tools (shell, file, MCP) so a script-based Skill can run. No permission
+                // prompts, and the MCP servers ride along when the assistant also enabled some.
+                var result = [
+                    "-p",
+                    "--model", model,
+                    "--input-format", "text",
+                    "--output-format", "stream-json",
+                    "--verbose",
+                    "--include-partial-messages",
+                    "--no-session-persistence",
+                    "--disable-slash-commands",
+                    "--dangerously-skip-permissions",
+                    "--no-chrome",
+                    "--max-turns", String(toolConfig.maxTurns)
+                ]
+                if !toolConfig.servers.isEmpty {
+                    result += ["--strict-mcp-config", "--mcp-config", toolConfig.claudeMCPConfigJSON]
+                }
+                if let effort { result += ["--effort", effort] }
+                return result
+            }
             if let toolConfig {
-                // Opt-in: the assistant's own MCP servers as Claude Code's tools. An `--allowedTools`
-                // allowlist (not bypass) scopes it to those servers — never Bash or file access.
+                // MCP-only: an `--allowedTools` allowlist scopes it to those servers — no Bash or files.
                 var result = [
                     "-p",
                     "--model", model,
@@ -236,6 +257,10 @@ private final class InstalledCLITurnRunner {
             result["OPENCODE_DISABLE_AUTOUPDATE"] = "true"
         case .codex:
             break
+        }
+        // The assistant's own variables win, so a Skill's script (e.g. JIRA_TOKEN) can authenticate.
+        if let toolConfig {
+            for (key, value) in toolConfig.environment { result[key] = value }
         }
         return result
     }

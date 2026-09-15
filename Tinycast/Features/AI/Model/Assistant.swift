@@ -25,6 +25,9 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
     /// Opt-in: let an installed Claude/OpenCode CLI route run this assistant's MCP servers as its own
     /// tools (a generated `--mcp-config`). Off by default — it un-sandboxes native CLI tool execution.
     var allowCLITools: Bool
+    /// A broader opt-in than `allowCLITools`: let a Claude/OpenCode CLI route run *shell* commands too,
+    /// so a script-based Skill (e.g. Jira's `jira_query.py`) can execute. Full native tool access.
+    var allowShellTools: Bool
     var opensTo: AIOpensTo
     var newChatAfter: AINewChatAfter
     var retention: AIRetention
@@ -51,6 +54,7 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
         skillIDs: Set<UUID> = [],
         mcpServerIDs: Set<UUID> = [],
         allowCLITools: Bool = false,
+        allowShellTools: Bool = false,
         opensTo: AIOpensTo = .recent,
         newChatAfter: AINewChatAfter = .fiveMinutes,
         retention: AIRetention = .forever,
@@ -72,6 +76,7 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
         self.skillIDs = skillIDs
         self.mcpServerIDs = mcpServerIDs
         self.allowCLITools = allowCLITools
+        self.allowShellTools = allowShellTools
         self.opensTo = opensTo
         self.newChatAfter = newChatAfter
         self.retention = retention
@@ -101,6 +106,8 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
             skillIDs: try c.decodeIfPresent(Set<UUID>.self, forKey: .skillIDs) ?? d.skillIDs,
             mcpServerIDs: try c.decodeIfPresent(Set<UUID>.self, forKey: .mcpServerIDs) ?? d.mcpServerIDs,
             allowCLITools: try c.decodeIfPresent(Bool.self, forKey: .allowCLITools) ?? d.allowCLITools,
+            allowShellTools: try c.decodeIfPresent(Bool.self, forKey: .allowShellTools)
+                ?? d.allowShellTools,
             opensTo: try c.decodeIfPresent(AIOpensTo.self, forKey: .opensTo) ?? d.opensTo,
             newChatAfter: try c.decodeIfPresent(AINewChatAfter.self, forKey: .newChatAfter)
                 ?? d.newChatAfter,

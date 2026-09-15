@@ -62,6 +62,7 @@ struct AssistantTests {
         }
         expect(decoded.name == "Legacy", "the present fields decode")
         expect(decoded.allowCLITools == false, "a missing allowCLITools falls back to its default")
+        expect(decoded.allowShellTools == false, "a missing allowShellTools falls back to its default")
         expect(decoded.opensTo == .recent, "a missing enum field falls back to its default")
         expect(decoded.symbol == "sparkles", "a missing string field falls back to its default")
     }

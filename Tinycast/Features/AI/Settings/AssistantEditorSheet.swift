@@ -12,6 +12,7 @@ struct AssistantEditorSheet: View {
     @Environment(AppSettings.self) private var appSettings
 
     @State private var draft: Assistant
+    @State private var environmentText = ""
 
     init(assistantID: UUID, onClose: @escaping () -> Void) {
         self.assistantID = assistantID
@@ -29,6 +30,7 @@ struct AssistantEditorSheet: View {
                 systemPromptSection
                 skillsSection
                 if appSettings.mcpEnabled { mcpSection }
+                toolsSection
                 behaviourSection
             }
             .formStyle(.grouped)
@@ -41,8 +43,16 @@ struct AssistantEditorSheet: View {
             .padding(Theme.Spacing.xl)
         }
         .frame(width: 640, height: 660)
-        .onAppear { if let live = store.assistant(id: assistantID) { draft = live } }
+        .onAppear {
+            if let live = store.assistant(id: assistantID) { draft = live }
+            environmentText = AssistantSecretStore.format(
+                AssistantSecretStore().environment(for: assistantID))
+        }
         .onChange(of: draft) { store.save(draft) }
+        .onChange(of: environmentText) {
+            try? AssistantSecretStore().save(
+                AssistantSecretStore.parse(environmentText), for: assistantID)
+        }
     }
 
     private var identitySection: some View {
@@ -156,19 +166,62 @@ struct AssistantEditorSheet: View {
                     Toggle(server.title, isOn: mcpBinding(server.id))
                 }
             }
-            Toggle(isOn: $draft.allowCLITools) {
-                Text("Allow CLI tools (advanced)")
-                Text(
-                    "Let an installed Claude or Codex CLI model run the enabled servers as its own "
-                        + "tools. Scoped to those servers only — no shell or file access — but it does "
-                        + "run native code with your CLI login's privileges.")
-            }
         } header: {
             Text("MCP servers")
         } footer: {
+            Text("Only the servers enabled here offer their tools to this assistant.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var toolsSection: some View {
+        Section {
+            Toggle(isOn: $draft.allowCLITools) {
+                Text("Allow MCP tools via CLI")
+                Text(
+                    "Let an installed Claude or Codex CLI model call the enabled MCP servers. Scoped to "
+                        + "those servers only — no shell or file access.")
+            }
+            Toggle(isOn: $draft.allowShellTools) {
+                Text("Allow shell tools (dangerous)")
+                Text(
+                    "Let a Claude CLI model run shell commands, so a script-based Skill (e.g. Jira's "
+                        + "jira_query.py) can execute. It runs arbitrary code with your CLI login's "
+                        + "privileges — enable only for assistants you trust.")
+            }
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text("Environment").foregroundStyle(.secondary)
+                TextEditor(text: $environmentText)
+                    .font(.system(.body, design: .monospaced))
+                    .scrollContentBackground(.hidden)
+                    .frame(height: 96)
+                    .padding(Theme.Spacing.xs)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+                            .fill(Theme.Colors.cardFill)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+                            .strokeBorder(Theme.Colors.cardStroke, lineWidth: 1)
+                    )
+                    .overlay(alignment: .topLeading) {
+                        if environmentText.isEmpty {
+                            Text("JIRA_TOKEN=…\nJIRA_URL=https://jira.corp.adobe.com")
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                                .padding(Theme.Spacing.sm)
+                                .allowsHitTesting(false)
+                        }
+                    }
+            }
+        } header: {
+            Text("CLI tools")
+        } footer: {
             Text(
-                "Only the servers enabled here offer their tools to this assistant. CLI tools apply to "
-                    + "the Claude and Codex CLI routes; API models (OpenAI/Anthropic/…) always call tools.")
+                "CLI tools apply to the Claude and Codex routes (API models always call tools). One "
+                    + "NAME=value per line; values are stored in your login Keychain and passed to the "
+                    + "CLI so a Skill's script can authenticate.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
