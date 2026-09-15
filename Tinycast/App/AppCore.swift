@@ -178,8 +178,10 @@ final class AppCore {
     @ObservationIgnored private(set) lazy var mcpCoordinator = MCPCoordinator(
         settings: settings, store: mcpSettings, manager: mcp, core: self)
     @ObservationIgnored private(set) lazy var aiChatCoordinator = AIChatCoordinator(
-        chat: aiChat, settings: settings, appIndex: appIndex, palette: palette,
-        paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
+        chat: aiChat, history: chatHistory, scope: .dynamic, settings: settings, appIndex: appIndex,
+        palette: palette, paletteCoordinator: paletteCoordinator,
+        settingsCoordinator: settingsCoordinator, core: self)
+    @ObservationIgnored private(set) lazy var aiChatWindowController = AIChatWindowController(
         core: self)
 
     @ObservationIgnored private lazy var windowController = PaletteWindowController(core: self)
@@ -454,6 +456,7 @@ final class AppCore {
         snippetListener.stop()
         snippetsStore.stop()
         aiChat.cancel()
+        aiChatWindowController.closeAll()
         chatGPTSubscription.stop()
         mcp.stop()
         installedAI.stop()

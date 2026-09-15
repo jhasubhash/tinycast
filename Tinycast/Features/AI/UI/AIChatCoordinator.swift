@@ -4,7 +4,17 @@ import Foundation
 /// Owns chat actions; views render `AIChatState` and route every mutation through here.
 @MainActor
 final class AIChatCoordinator {
+    /// How a coordinator resolves its assistant scope. The launcher's follows the palette's live
+    /// selection; a pop-out's is pinned to the scope it detached with, so summoning another
+    /// assistant never re-points its model or wipes its transcript.
+    enum Scope {
+        case dynamic
+        case pinned(UUID?)
+    }
+
     private let chat: AIChatState
+    private let history: ChatHistoryStore
+    private var scope: Scope
     private let settings: AppSettings
     private let appIndex: AppIndex
     private let palette: PaletteState
@@ -13,11 +23,14 @@ final class AIChatCoordinator {
     private unowned let core: AppCore
 
     init(
-        chat: AIChatState, settings: AppSettings, appIndex: AppIndex, palette: PaletteState,
+        chat: AIChatState, history: ChatHistoryStore, scope: Scope = .dynamic,
+        settings: AppSettings, appIndex: AppIndex, palette: PaletteState,
         paletteCoordinator: PaletteCoordinator, settingsCoordinator: SettingsCoordinator,
         core: AppCore
     ) {
         self.chat = chat
+        self.history = history
+        self.scope = scope
         self.settings = settings
         self.appIndex = appIndex
         self.palette = palette
@@ -33,16 +46,19 @@ final class AIChatCoordinator {
             // Before the handle closes: cancelling an open reply saves the conversation it ends.
             chat.startNewChat()
             core.applyInstalledAILifecycle()
-            core.chatHistory.close()
+            history.close()
+            core.aiChatWindowController.closeAll()
             if palette.mode == .ai || palette.mode == .aiHistory { palette.prepare(mode: .launcher) }
             return
         }
         core.applyInstalledAILifecycle()
         // Deferred off the launch path like the clipboard's own read; history fills in behind it.
         Task {
-            core.chatHistory.load()
+            history.load()
             // Inside the enabled branch only: off means the file is untouched, however old it gets.
             applyRetention()
+            // Restored once, the moment history is actually there to show.
+            core.aiChatWindowController.restoreIfNeeded()
         }
     }
 
@@ -56,7 +72,7 @@ final class AIChatCoordinator {
         guard settings.aiEnabled,
             let cutoff = core.aiSettings.retention.cutoff(from: Date())
         else { return }
-        core.chatHistory.prune(before: cutoff)
+        history.prune(before: cutoff)
     }
 
     func showChat() {
@@ -117,7 +133,7 @@ final class AIChatCoordinator {
             if paletteCoordinator.isShowing(.ai), palette.aiBar { paletteCoordinator.hidePalette() }
         }
         core.hotKeys.setBinding(nil, for: .assistant(id: id))
-        core.chatHistory.deleteScope(id)
+        history.deleteScope(id)
         try? AssistantSecretStore().remove(for: id)
         core.assistants.remove(id: id)
     }
@@ -140,8 +156,8 @@ final class AIChatCoordinator {
     /// Point the history store at a scope; a real change drops the now-foreign resident transcript so
     /// the open policy starts the new scope clean.
     private func switchScope(to id: UUID?, ephemeral: Bool) {
-        let changed = core.chatHistory.scope != id
-        core.chatHistory.setScope(id, ephemeral: ephemeral)
+        let changed = history.scope != id
+        history.setScope(id, ephemeral: ephemeral)
         if changed { chat.startNewChat() }
     }
 
@@ -156,7 +172,7 @@ final class AIChatCoordinator {
     private func applyOpenPolicy() {
         // A reply still arriving was asked for; resetting would discard the answer.
         guard !chat.isStreaming else { return }
-        let recent = core.chatHistory.conversations.first
+        let recent = history.conversations.first
         let hasTranscript = !chat.session.messages.isEmpty
         // Staged files are unsent work: neither branch may throw them away on a plain re-summon.
         let hasStaging = !chat.pendingAttachments.isEmpty
@@ -209,7 +225,7 @@ final class AIChatCoordinator {
                     isEnabled: assistant?.systemPromptEnabled ?? core.aiSettings.systemPromptEnabled),
                 contextBudget: contextBudget)
             // The first message grows the bar past its composer into the transcript.
-            if sent { palette.aiBarExpanded = true }
+            if sent, isDynamic { palette.aiBarExpanded = true }
             return sent
         } catch {
             chat.report(error.localizedDescription)
@@ -237,10 +253,17 @@ final class AIChatCoordinator {
 
     func startNewChat() {
         chat.startNewChat(userInitiated: true)
+        // A pinned pop-out owns no palette surface; only the launcher's bar reflows here.
+        guard isDynamic else { return }
         // A fresh conversation, not a fresh root: whatever opened chat is still behind it.
         palette.replace(mode: .ai)
         // The bar shrinks back to the composer; a new chat has no transcript to show.
         palette.aiBarExpanded = false
+    }
+
+    private var isDynamic: Bool {
+        if case .dynamic = scope { return true }
+        return false
     }
 
     func showHistory() {
@@ -277,9 +300,60 @@ final class AIChatCoordinator {
         Paster.copyPlainText(text)
     }
 
-    /// The Assistant this summon is scoped to, or nil for the default bar.
+    /// The chat screen's ⌘K "Pop Out" command: detach this live conversation into its own
+    /// standalone window pinned to the current scope, then leave the palette. The bar starts clean
+    /// so the two surfaces never diverge over one shared session id.
+    func popOut() {
+        guard settings.aiEnabled else { return }
+        // The pop-out's composer has no attachment chips to show or clear them from.
+        chat.clearAttachments()
+        core.aiChatWindowController.popOut(scope: palette.activeAssistantID, session: chat.session)
+        chat.startNewChat()
+        paletteCoordinator.hidePalette()
+    }
+
+    /// Detach a live conversation into this (pinned) coordinator's own chat and scope; the caller
+    /// is the launcher handing its session to the pop-out.
+    func pin(to assistantID: UUID?, adopting session: ChatSession) {
+        scope = .pinned(assistantID)
+        history.setScope(assistantID, ephemeral: scopeIsEphemeral(assistantID))
+        chat.adopt(session)
+    }
+
+    /// Re-pin to a saved scope on relaunch and resume its most recent conversation, so a pop-out
+    /// left open reopens showing what it detached rather than the launcher's live chat.
+    func restore(to assistantID: UUID?) {
+        scope = .pinned(assistantID)
+        history.setScope(assistantID, ephemeral: scopeIsEphemeral(assistantID))
+        if let recent = history.conversations.first {
+            chat.open(id: recent.id)
+        } else {
+            chat.startNewChat()
+        }
+    }
+
+    /// The scope a pinned coordinator carries, for the pop-out window to persist across launches.
+    var pinnedAssistantID: UUID? {
+        if case .pinned(let id) = scope { return id }
+        return nil
+    }
+
+    private func scopeIsEphemeral(_ assistantID: UUID?) -> Bool {
+        assistantID.flatMap { core.assistants.assistant(id: $0)?.ephemeral } ?? false
+    }
+
+    /// The Assistant this coordinator is scoped to, or nil for the default bar.
     var activeAssistant: Assistant? {
-        palette.activeAssistantID.flatMap { core.assistants.assistant(id: $0) }
+        scopeAssistantID.flatMap { core.assistants.assistant(id: $0) }
+    }
+
+    /// The launcher's coordinator follows the palette's live selection; a pinned pop-out holds its
+    /// own, so another assistant's summon never re-points it.
+    private var scopeAssistantID: UUID? {
+        switch scope {
+        case .dynamic: palette.activeAssistantID
+        case .pinned(let id): id
+        }
     }
 
     /// The model the summon uses: the assistant's, else the global default. The fall-through keeps

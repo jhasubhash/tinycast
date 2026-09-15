@@ -55,6 +55,12 @@ struct AIScreen: PaletteScreen {
             PopoverMenuItem(title: "AI Settings", systemImage: "slider.horizontal.3", shortcut: "⌘,") {
                 coordinator.showSettings()
             })
+        items.append(
+            PopoverMenuItem(
+                title: "Pop Out", systemImage: "macwindow.badge.plus", startsSection: true
+            ) {
+                coordinator.popOut()
+            })
         return PopoverMenuContent(header: chat.session.title, items: items)
     }
 
@@ -101,7 +107,7 @@ struct AIScreen: PaletteScreen {
     }
 }
 
-private struct AIChatView: View {
+struct AIChatView: View {
     let chat: AIChatState
     let settings: AISettingsStore
     let availability: () -> String?
@@ -133,7 +139,7 @@ private struct AIChatView: View {
     }
 }
 
-private struct AIEmptyState: View {
+struct AIEmptyState: View {
 
     @Environment(\.metrics) private var metrics
     let message: String?

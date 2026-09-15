@@ -138,6 +138,18 @@ final class AIChatState {
         startedFresh = userInitiated
     }
 
+    /// Take over another surface's live conversation wholesale - the pop-out claiming the bar's
+    /// chat as it detaches. The adopting store persists it under its own (pinned) scope.
+    func adopt(_ session: ChatSession) {
+        cancel()
+        self.session = session
+        usage = nil
+        notice = nil
+        clearStaging()
+        startedFresh = false
+        history.save(session)
+    }
+
     /// Staged images belong to the conversation they were picked in; leaving it drops them.
     @discardableResult
     func open(id: UUID) -> Bool {
