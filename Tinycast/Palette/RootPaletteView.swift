@@ -1024,8 +1024,9 @@ struct RootPaletteView: View {
         switch openMenu {
         case .app: .bottomLeading
         case .actions: .bottomTrailing
-        case .argumentOptions: .belowHeaderTrailing
-        case .clipboardFilter, .fileSearchFilter, .aiModel, .aiReasoning, .extensionAccessory:
+        case .aiModel, .aiReasoning:
+            composeAtBottom ? .aboveHeaderTrailing : .belowHeaderTrailing
+        case .argumentOptions, .clipboardFilter, .fileSearchFilter, .extensionAccessory:
             .belowHeaderTrailing
         case nil: nil
         }

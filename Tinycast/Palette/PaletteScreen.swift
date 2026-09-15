@@ -103,7 +103,7 @@ private extension MenuPanelCorner {
         switch self {
         case .bottomLeading: .bottomLeading
         case .bottomTrailing: .bottomTrailing
-        case .belowHeaderTrailing: .none
+        case .belowHeaderTrailing, .aboveHeaderTrailing: .none
         }
     }
 }

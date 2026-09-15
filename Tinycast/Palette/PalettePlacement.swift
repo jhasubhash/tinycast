@@ -45,12 +45,15 @@ enum MenuPanelCorner {
     case bottomLeading
     case bottomTrailing
     case belowHeaderTrailing
+    /// Mirror of `belowHeaderTrailing` for a header docked at the bottom: the menu opens upward.
+    case aboveHeaderTrailing
 
     var layerAnchor: CGPoint {
         switch self {
         case .bottomLeading: CGPoint(x: 0, y: 0)
         case .bottomTrailing: CGPoint(x: 1, y: 0)
         case .belowHeaderTrailing: CGPoint(x: 1, y: 1)
+        case .aboveHeaderTrailing: CGPoint(x: 1, y: 0)
         }
     }
 
@@ -73,6 +76,10 @@ enum MenuPanelCorner {
                 CGPoint(
                     x: parentFrame.maxX - inset * 2 - contentSize.width,
                     y: parentFrame.maxY - headerExtent - contentSize.height)
+            case .aboveHeaderTrailing:
+                CGPoint(
+                    x: parentFrame.maxX - inset * 2 - contentSize.width,
+                    y: parentFrame.minY + headerExtent)
             }
         return CGRect(origin: origin, size: contentSize)
     }

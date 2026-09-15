@@ -265,6 +265,9 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             setStoredPosition(
                 anchor.map { PalettePlacement.offset(of: $0, on: session.visibleFrame) },
                 on: session.displayKey)
+            // A drag can carry the bar across the fold; re-resolve which way it grows so the menus
+            // and the docked composer follow it without waiting for the next resize.
+            if let anchor { core.palette.aiBarGrowsUp = growsUpward(anchor: anchor) }
             return
         }
         anchor = session.home
