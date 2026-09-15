@@ -335,6 +335,16 @@ private struct PluginWindowChrome<Content: View>: View {
                     .background(VisualEffectView())
             }
             .clipShape(RoundedRectangle(cornerRadius: metrics.radius.panel, style: .continuous))
+            // A click anywhere off the palette closes it, as the app's own ⌘K menus do. Sits below
+            // the pill and the palette overlays (added after), so their own clicks still register.
+            .overlay {
+                if menu.open {
+                    Color.black.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .gesture(DragGesture(minimumDistance: 0).onEnded { _ in menu.open = false })
+                        .onRightClick { menu.open = false }
+                }
+            }
             .overlay(alignment: .bottomTrailing) { actionsButton }
             .overlay(alignment: .bottomTrailing) {
                 if menu.open {
