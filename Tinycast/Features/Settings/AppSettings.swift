@@ -267,6 +267,11 @@ final class AppSettings {
         aiBarPositions[display] = [offset.x, offset.y]
     }
 
+    /// Keep the floating AI Chat bar open when focus moves to another app, instead of hiding on blur.
+    var aiBarStaysOpen: Bool {
+        didSet { defaults.set(aiBarStaysOpen, forKey: Key.aiBarStaysOpen.rawValue) }
+    }
+
     // Feature switches, off out of the box, and off means fully off.
     var fileSearchEnabled: Bool {
         didSet { defaults.set(fileSearchEnabled, forKey: Key.fileSearchEnabled.rawValue) }
@@ -590,6 +595,7 @@ final class AppSettings {
         aiBarPositions =
             defaults.dictionary(forKey: Key.aiBarPosition.rawValue)
             as? [String: [Double]] ?? [:]
+        aiBarStaysOpen = defaults.bool(forKey: Key.aiBarStaysOpen.rawValue)
         fileSearchEnabled = defaults.bool(forKey: Key.fileSearchEnabled.rawValue)
         // Unset seeds home; a stored empty array is a cleared list that searches nothing.
         fileSearchScopes =

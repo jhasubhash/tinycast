@@ -125,6 +125,7 @@ struct AISettingsView: View {
 
     private var chatSection: some View {
         @Bindable var settings = settings
+        @Bindable var appSettings = appSettings
         return Section {
             SettingsRow(
                 title: "Floating bar",
@@ -133,6 +134,10 @@ struct AISettingsView: View {
                 subtitleLineLimit: 2, anchor: .aiChat
             ) {
                 ShortcutRecorder(action: .toggleAIBar)
+            }
+            Toggle(isOn: $appSettings.aiBarStaysOpen) {
+                SettingsRowTitle(.aiChat, "Keep the floating bar open")
+                Text("Stay open when you click into another app, instead of closing on focus loss.")
             }
             Toggle(isOn: $settings.webSearchEnabled) {
                 SettingsRowTitle(.aiChat, "Web search")

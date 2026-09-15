@@ -210,6 +210,8 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     /// Not for one of our own dialogs: hiding would tear down a command mid-`confirmAlert`.
     func windowDidResignKey(_ notification: Notification) {
         guard isVisible, !core.isShowingDialog else { return }
+        // The floating AI bar can be pinned to survive a click into another app.
+        if core.palette.aiBar, core.settings.aiBarStaysOpen { return }
         core.paletteCoordinator.hidePalette(restoreFocus: false)
     }
 
