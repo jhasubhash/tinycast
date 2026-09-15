@@ -8,6 +8,8 @@ struct PluginWindowCommand: Identifiable {
     let title: String
     let systemImage: String
     var isDestructive = false
+    /// The letter of its ⌘-shortcut (e.g. "w"), shown as a keycap and run from the panel.
+    var shortcut: String?
     let action: () -> Void
 }
 
@@ -48,7 +50,6 @@ private func visibleCommands(_ all: [PluginWindowCommand], _ query: String) -> [
 final class PluginWindowPanel: NSPanel {
     /// The plugin route this window shows, so the controller can find and drop it on close.
     var identityKey: String?
-    var onCloseChord: (() -> Void)?
     /// The window's own ⌘K palette; key handling below drives it, scoped to this panel.
     var commandMenu: PluginWindowMenu?
     var commandsProvider: (() -> [PluginWindowCommand])?
@@ -85,21 +86,22 @@ final class PluginWindowPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
-    /// ⌘W closes the window; ⌘K toggles its command palette. Both are scoped to the key window, so
-    /// they never leak between several open pop-outs the way an app-wide monitor would.
+    /// ⌘K toggles the command palette; a command's own ⌘-shortcut (⌘W / ⌘S / ⌘P) runs it. All are
+    /// scoped to the key window, so they never leak between several open pop-outs.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if !event.isARepeat,
+        guard !event.isARepeat,
             event.modifierFlags.intersection([.command, .option, .control, .shift]) == .command,
-            let key = event.charactersIgnoringModifiers?.lowercased() {
-            if key == "w" {
-                onCloseChord?()
-                return true
-            }
-            if key == "k", let commandMenu {
-                commandMenu.open.toggle()
-                if commandMenu.open { commandMenu.reset() }
-                return true
-            }
+            let key = event.charactersIgnoringModifiers?.lowercased()
+        else { return super.performKeyEquivalent(with: event) }
+        if key == "k", let commandMenu {
+            commandMenu.open.toggle()
+            if commandMenu.open { commandMenu.reset() }
+            return true
+        }
+        if let command = commandsProvider?().first(where: { $0.shortcut == key }) {
+            commandMenu?.open = false
+            command.action()
+            return true
         }
         return super.performKeyEquivalent(with: event)
     }
@@ -212,7 +214,6 @@ final class PluginWindowController: NSObject, NSWindowDelegate {
         panel.commandMenu = menu
         panel.commandsProvider = { [weak self] in self?.windowCommands(key: key) ?? [] }
         panel.delegate = self
-        panel.onCloseChord = { [weak self] in self?.close(key: key) }
         panel.setFrameAutosaveName(Self.autosaveName(for: key))
         if !panel.setFrameUsingName(Self.autosaveName(for: key)) { positionOnCursorScreen(panel, size: size) }
 
@@ -242,13 +243,16 @@ final class PluginWindowController: NSObject, NSWindowDelegate {
             PluginWindowCommand(
                 title: allSpaces ? "Show on This Space Only" : "Show on All Spaces",
                 systemImage: allSpaces ? "square.on.square.dashed" : "square.on.square",
+                shortcut: "s",
                 action: { [weak self] in self?.setShowsOnAllSpaces(!allSpaces, key: key) }),
             PluginWindowCommand(
                 title: inFront ? "Don't Keep in Front" : "Keep in Front of Other Apps",
                 systemImage: inFront ? "pin.slash" : "pin",
+                shortcut: "p",
                 action: { [weak self] in self?.setKeepsInFront(!inFront, key: key) }),
             PluginWindowCommand(
                 title: "Close Window", systemImage: "xmark", isDestructive: true,
+                shortcut: "w",
                 action: { [weak self] in self?.close(key: key) }),
         ]
     }
@@ -430,6 +434,12 @@ private struct PluginWindowPalette: View {
                 .font(.body).lineLimit(1)
                 .foregroundStyle(command.isDestructive ? Color.red : .primary)
             Spacer(minLength: 8)
+            if let shortcut = command.shortcut {
+                HStack(spacing: 2) {
+                    WindowKeyCap(text: "⌘")
+                    WindowKeyCap(text: shortcut.uppercased())
+                }
+            }
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
