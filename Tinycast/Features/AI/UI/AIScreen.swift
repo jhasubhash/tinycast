@@ -128,7 +128,8 @@ struct AIChatView: View {
                     messages: chat.session.messages,
                     status: chat.liveStatus,
                     showReasoning: showReasoning,
-                    usage: chat.usage)
+                    usage: chat.usage,
+                    thinking: chat.isReasoning)
             }
         }
         .onAppear {

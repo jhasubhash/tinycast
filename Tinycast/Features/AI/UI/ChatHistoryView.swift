@@ -141,10 +141,11 @@ struct ChatHistoryPreview: View {
             if conversationID == chat.session.id, !chat.session.messages.isEmpty {
                 ChatTranscriptView(
                     messages: chat.session.messages, status: chat.liveStatus,
-                    showReasoning: false, usage: chat.usage)
+                    showReasoning: false, usage: chat.usage, thinking: chat.isReasoning)
             } else if let session {
                 ChatTranscriptView(
-                    messages: session.messages, status: nil, showReasoning: false, usage: nil)
+                    messages: session.messages, status: nil, showReasoning: false, usage: nil,
+                    thinking: false)
             } else if conversationID != nil {
                 ProgressView().controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

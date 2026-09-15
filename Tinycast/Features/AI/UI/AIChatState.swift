@@ -7,6 +7,8 @@ final class AIChatState {
     private(set) var session = ChatSession()
     private(set) var isStreaming = false
     private(set) var isThinking = false
+    /// Streaming has gone quiet with nothing running — the reply is reasoning without saying so.
+    private(set) var isStalled = false
     private(set) var usage: AIUsage?
     private(set) var notice: String?
     /// Files staged for the next message; they go out with whatever is typed next.
@@ -24,9 +26,13 @@ final class AIChatState {
     /// Deltas buffered between flushes, so the transcript re-renders per cadence, not per token.
     @ObservationIgnored private var pendingText = ""
     @ObservationIgnored private var flushTask: Task<Void, Never>?
+    @ObservationIgnored private var stallTask: Task<Void, Never>?
     @ObservationIgnored private var lastFlush = ContinuousClock().now
 
     private static let flushInterval: Duration = .milliseconds(40)
+    /// Quiet longer than this mid-answer reads as thinking; polled on this cadence.
+    private static let stallThreshold: Duration = .seconds(2)
+    private static let stallTick: Duration = .milliseconds(400)
 
     init(history: ChatHistoryStore) {
         self.history = history
@@ -53,6 +59,8 @@ final class AIChatState {
         isStreaming = true
         isThinking = false
         usage = nil
+        lastFlush = ContinuousClock().now
+        startStallWatch()
         history.save(session)
 
         replyGeneration += 1
@@ -187,6 +195,9 @@ final class AIChatState {
     /// The line shown in the empty streaming bubble while nothing has arrived yet.
     var liveStatus: String? { isThinking ? "Thinking…" : nil }
 
+    /// The reply is reasoning: it said so, or it has gone quiet mid-answer.
+    var isReasoning: Bool { isThinking || isStalled }
+
     var lastAssistantText: String? {
         session.messages.last(where: { $0.role == .assistant && !$0.text.isEmpty })?.text
     }
@@ -274,6 +285,33 @@ final class AIChatState {
         pendingText = ""
     }
 
+    /// A search or tool is mid-flight, so the reply is busy, not silently thinking.
+    private var hasLiveActivity: Bool {
+        guard let message = session.messages.last, message.role == .assistant else { return false }
+        return message.searches.contains { !$0.isComplete }
+            || message.toolUses.contains { $0.state == .running }
+    }
+
+    private func startStallWatch() {
+        stallTask?.cancel()
+        isStalled = false
+        stallTask = Task { [weak self] in
+            while true {
+                try? await Task.sleep(for: Self.stallTick)
+                guard let self, !Task.isCancelled, self.isStreaming else { return }
+                let quiet = ContinuousClock().now - self.lastFlush
+                let stalled = quiet >= Self.stallThreshold && !self.hasLiveActivity
+                if stalled != self.isStalled { self.isStalled = stalled }
+            }
+        }
+    }
+
+    private func stopStallWatch() {
+        stallTask?.cancel()
+        stallTask = nil
+        isStalled = false
+    }
+
     private func finishLast(state: ChatMessage.State, fallback: String) {
         flushPendingText()
         discardPendingText()
@@ -291,6 +329,7 @@ final class AIChatState {
         history.save(session)
         isStreaming = false
         isThinking = false
+        stopStallWatch()
         replyTask = nil
     }
 }

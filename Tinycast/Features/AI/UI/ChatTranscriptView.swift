@@ -8,6 +8,8 @@ struct ChatTranscriptView: View {
     let status: String?
     let showReasoning: Bool
     let usage: AIUsage?
+    /// True while the streaming reply is in a reasoning phase — re-shown each time it thinks again.
+    let thinking: Bool
     /// Cleared when the reader scrolls up, so a streaming reply stops dragging them back down.
     @State private var followsTail = true
 
@@ -29,7 +31,8 @@ struct ChatTranscriptView: View {
                         ChatMessageView(
                             message: message,
                             showReasoning: showReasoning,
-                            status: message.id == messages.last?.id ? status : nil
+                            status: message.id == messages.last?.id ? status : nil,
+                            thinking: thinking && message.id == messages.last?.id
                         )
                         .id(message.id)
                     }
@@ -114,6 +117,8 @@ private struct ChatMessageView: View {
     let message: ChatMessage
     let showReasoning: Bool
     let status: String?
+    /// Live while the model is thinking; false for any settled or non-last message.
+    let thinking: Bool
 
     @State private var hovered = false
 
@@ -199,13 +204,22 @@ private struct ChatMessageView: View {
                 }
             }
             if showReasoning, !message.reasoning.isEmpty {
-                ChatReasoningView(
-                    reasoning: message.reasoning,
-                    thinking: message.state == .streaming && message.text.isEmpty)
+                ChatReasoningView(reasoning: message.reasoning, thinking: thinking)
             }
             if !message.text.isEmpty || !message.searches.isEmpty || !message.toolUses.isEmpty {
                 rendered
             }
+            if thinking, !showReasoning || message.reasoning.isEmpty {
+                thinkingIndicator
+            }
+        }
+    }
+
+    /// The live reasoning cue for routes that stream no reasoning text to fold into a section.
+    private var thinkingIndicator: some View {
+        HStack(spacing: metrics.spacing.sm) {
+            ProgressView().controlSize(.small)
+            Text("Thinking…").foregroundStyle(.secondary)
         }
     }
 
@@ -262,9 +276,9 @@ private struct ChatReasoningView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        // The answer starting is the cue to fold the thinking away; the reader can reopen it.
+        // Track the live reasoning phase: unfold while it thinks, fold once the answer resumes.
         .onChange(of: thinking) { _, nowThinking in
-            if !nowThinking { withAnimation(.easeOut(duration: Theme.Duration.hover)) { expanded = false } }
+            withAnimation(.easeOut(duration: Theme.Duration.hover)) { expanded = nowThinking }
         }
     }
 }
