@@ -48,6 +48,8 @@ final class PluginManager {
     @ObservationIgnored var onDidPush: (() -> Void)?
     /// The entry ids an uninstall invalidated, so another feature can drop what it keyed to them.
     @ObservationIgnored var onDidUninstall: (([String]) -> Void)?
+    /// Fired after a scan updates the installed set, so pop-out windows can be restored once loaded.
+    @ObservationIgnored var onDidRefresh: (() -> Void)?
 
     @ObservationIgnored private weak var appIndex: AppIndex?
     @ObservationIgnored private var loaded: (any TinycastPlugin)?
@@ -135,6 +137,7 @@ final class PluginManager {
             guard let self, found != self.installed else { return }
             self.installed = found
             self.publishLauncherEntries()
+            self.onDidRefresh?()
         }
     }
 

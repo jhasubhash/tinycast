@@ -35,6 +35,7 @@ final class PluginCoordinator {
             self?.palette.query = ""
             self?.palette.selection = 0
         }
+        plugins.onDidRefresh = { [weak self] in self?.core.pluginWindowController.restoreWindows() }
     }
 
     // MARK: - Feature presence
@@ -153,6 +154,16 @@ final class PluginCoordinator {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(link, forType: .string)
         core.showMessage("Copied deep link")
+    }
+
+    /// The scaffold's "Pop Out" command: open the current view as its own standalone window and
+    /// leave the palette, so the plugin keeps running on screen without the launcher over it.
+    func popOut(_ route: PluginRoute) {
+        guard let identifier = plugins.runningIdentifier,
+            let install = plugins.install(forIdentifier: identifier)
+        else { return }
+        core.pluginWindowController.open(install: install, route: route)
+        exitPluginScreen()
     }
 
     /// Escape past an empty search field: pop the plugin's own stack, then leave the plugin.
