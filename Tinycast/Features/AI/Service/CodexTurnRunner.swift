@@ -80,7 +80,7 @@ final class CodexTurnRunner {
             guard let item = params["item"]?.objectValue else { return }
             switch item["type"]?.stringValue {
             case "webSearch": activeContinuation?.yield(.searching(item["query"]?.stringValue))
-            case "reasoning": activeContinuation?.yield(.thinking)
+            case "reasoning": activeContinuation?.yield(.thinking(""))
             default: break
             }
         case "item/completed":

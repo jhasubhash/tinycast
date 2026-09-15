@@ -144,6 +144,10 @@ struct AISettingsView: View {
                 Text(
                     "Sends prompts on to a search engine when the route offers one — Codex and OpenRouter.")
             }
+            Toggle(isOn: $settings.showReasoning) {
+                SettingsRowTitle(.aiChat, "Stream reasoning")
+                Text("Shows the model's thinking as it streams, instead of a lone spinner.")
+            }
         } header: {
             SettingsSectionHeader(.aiChat)
         } footer: {

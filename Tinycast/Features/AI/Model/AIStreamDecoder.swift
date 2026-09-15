@@ -123,7 +123,7 @@ struct AIStreamDecoder: Sendable {
             if let content = choice.delta?.content, !content.isEmpty {
                 events.append(.text(content))
             } else if choice.delta?.hasReasoning == true {
-                events.append(.thinking)
+                events.append(.thinking(choice.delta?.reasoningText ?? ""))
             }
             for fragment in choice.delta?.toolCalls ?? [] { absorb(fragment) }
             if choice.finishReason == "tool_calls" { events.append(contentsOf: flushToolCalls()) }
@@ -168,7 +168,7 @@ struct AIStreamDecoder: Sendable {
                 partialToolCalls[event.index ?? 0]?.arguments += event.delta?.partialJSON ?? ""
                 return []
             }
-            return event.delta?.type == "thinking_delta" ? [.thinking] : []
+            return event.delta?.type == "thinking_delta" ? [.thinking(event.delta?.thinking ?? "")] : []
         case "message_start":
             usage.inputTokens = event.message?.usage?.inputTokens ?? usage.inputTokens
             return [.usage(usage)]
@@ -223,6 +223,11 @@ private struct OpenAIChunk: Decodable {
                     || reasoningDetails?.contains(where: { $0.text?.isEmpty == false }) == true
             }
 
+            var reasoningText: String {
+                if let reasoning, !reasoning.isEmpty { return reasoning }
+                return reasoningDetails?.compactMap { $0.text }.joined() ?? ""
+            }
+
             enum CodingKeys: String, CodingKey {
                 case content, reasoning
                 case reasoningDetails = "reasoning_details"
@@ -260,11 +265,12 @@ private struct AnthropicEvent: Decodable {
     struct Delta: Decodable {
         let type: String?
         let text: String?
+        let thinking: String?
         let partialJSON: String?
         let stopReason: String?
 
         enum CodingKeys: String, CodingKey {
-            case type, text
+            case type, text, thinking
             case partialJSON = "partial_json"
             case stopReason = "stop_reason"
         }

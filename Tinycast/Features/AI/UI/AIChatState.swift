@@ -185,8 +185,12 @@ final class AIChatState {
             guard let last = session.messages.last, last.role == .assistant else { return }
             if isThinking { isThinking = false }
             queueDelta(text)
-        case .thinking:
+        case .thinking(let reasoning):
             isThinking = true
+            guard !reasoning.isEmpty else { return }
+            guard var message = session.messages.last, message.role == .assistant else { return }
+            message.reasoning += reasoning
+            session.replaceLast(with: message)
         case .searching(let query):
             flushPendingText()
             guard var message = session.messages.last, message.role == .assistant else { return }

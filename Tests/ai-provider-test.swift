@@ -585,7 +585,9 @@ struct AIProviderTests {
             """.utf8)
         var events = (try? openAI.feed(openAIData)) ?? []
         events += (try? openAI.finish()) ?? []
-        expect(events.contains(.thinking), "reasoning is surfaced as state, not answer text")
+        expect(
+            events.contains { if case .thinking(let r) = $0 { return r == "working" } else { return false } },
+            "reasoning streams as thinking text, not answer text")
         expect(events.contains(.text("Hello")), "OpenAI-compatible text is decoded")
         expect(
             events.contains(.usage(AIUsage(inputTokens: 3, outputTokens: 2))),
@@ -640,7 +642,8 @@ struct AIProviderTests {
                 expect(!text.isEmpty, "\(capture.file) yields answer text")
             }
             expect(
-                whole.contains(.thinking) == capture.reasons,
+                whole.contains { if case .thinking = $0 { return true } else { return false } }
+                    == capture.reasons,
                 "\(capture.file) surfaces thinking only when the model reasoned")
             expect(whole.last == .finished, "\(capture.file) ends on the done marker")
             expect(

@@ -15,6 +15,8 @@ struct ChatMessage: Identifiable, Equatable, Sendable {
     let id: UUID
     let role: Role
     var text: String
+    /// The model's streamed reasoning; live during a turn, not persisted with the saved conversation.
+    var reasoning: String
     var state: State
     let sentAt: Date
     let images: [AIImage]
@@ -29,7 +31,7 @@ struct ChatMessage: Identifiable, Equatable, Sendable {
         id: UUID = UUID(), role: Role, text: String, state: State = .complete,
         sentAt: Date = Date(), images: [AIImage] = [], documents: [AIDocument] = [],
         searches: [ChatSearch] = [],
-        toolUses: [ChatToolUse] = []
+        toolUses: [ChatToolUse] = [], reasoning: String = ""
     ) {
         self.id = id
         self.role = role
@@ -40,6 +42,7 @@ struct ChatMessage: Identifiable, Equatable, Sendable {
         self.documents = documents
         self.searches = searches
         self.toolUses = toolUses
+        self.reasoning = reasoning
     }
 
     /// The reply split around what it did: text, search or tool, text… rendered where it happened.

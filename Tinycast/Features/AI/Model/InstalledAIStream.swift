@@ -29,7 +29,7 @@ enum InstalledAIStreamDecoder {
         case "text":
             if let text = part?["text"] as? String, !text.isEmpty { frame.events = [.text(text)] }
         case "step_start":
-            frame.events = [.thinking]
+            frame.events = [.thinking("")]
         case "step_finish":
             if let tokens = part?["tokens"] as? [String: Any] {
                 frame.events.append(
@@ -85,7 +85,7 @@ enum InstalledAIStreamDecoder {
                     frame.events = [.text(text)]
                 }
             case "thinking_delta":
-                frame.events = [.thinking]
+                frame.events = [.thinking(delta["thinking"] as? String ?? "")]
             default:
                 break
             }

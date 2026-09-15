@@ -96,6 +96,7 @@ struct AIScreen: PaletteScreen {
         AnyView(
             AIChatView(
                 chat: chat, settings: settings, availability: coordinator.availability,
+                showReasoning: coordinator.activeAssistant?.showReasoning ?? settings.showReasoning,
                 onConfigure: coordinator.showSettings, onAppear: coordinator.prepareForChat))
     }
 }
@@ -104,6 +105,7 @@ private struct AIChatView: View {
     let chat: AIChatState
     let settings: AISettingsStore
     let availability: () -> String?
+    let showReasoning: Bool
     let onConfigure: () -> Void
     let onAppear: () -> Void
     @State private var unavailability: String?
@@ -119,6 +121,7 @@ private struct AIChatView: View {
                 ChatTranscriptView(
                     messages: chat.session.messages,
                     status: chat.liveStatus,
+                    showReasoning: showReasoning,
                     usage: chat.usage)
             }
         }

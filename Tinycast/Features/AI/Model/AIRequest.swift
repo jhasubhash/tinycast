@@ -129,7 +129,8 @@ struct AIUsage: Equatable, Sendable {
 
 enum AIStreamEvent: Equatable, Sendable {
     case text(String)
-    case thinking
+    /// The model's reasoning, streamed as it thinks; empty for a route that signals thinking sans text.
+    case thinking(String)
     case searching(String?)
     case searched(String?)
     /// What a transport emits; the loop consumes it and never passes it on to the transcript.

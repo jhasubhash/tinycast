@@ -18,6 +18,8 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
     /// `nil` falls forward to the global default model, so an assistant need not name one.
     var model: AIModelSelection?
     var webSearch: Bool
+    /// On by default: the model's reasoning streams into this assistant's transcript as it thinks.
+    var showReasoning: Bool
     /// Enabled Skills — a subset of the library. Instructions injected into the turn.
     var skillIDs: Set<UUID>
     /// Enabled MCP servers — a subset of the library. Tools offered on API routes only.
@@ -51,6 +53,7 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
         systemPromptEnabled: Bool = true,
         model: AIModelSelection? = nil,
         webSearch: Bool = false,
+        showReasoning: Bool = true,
         skillIDs: Set<UUID> = [],
         mcpServerIDs: Set<UUID> = [],
         allowCLITools: Bool = false,
@@ -73,6 +76,7 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
         self.systemPromptEnabled = systemPromptEnabled
         self.model = model
         self.webSearch = webSearch
+        self.showReasoning = showReasoning
         self.skillIDs = skillIDs
         self.mcpServerIDs = mcpServerIDs
         self.allowCLITools = allowCLITools
@@ -103,6 +107,7 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
                 ?? d.systemPromptEnabled,
             model: try c.decodeIfPresent(AIModelSelection.self, forKey: .model) ?? d.model,
             webSearch: try c.decodeIfPresent(Bool.self, forKey: .webSearch) ?? d.webSearch,
+            showReasoning: try c.decodeIfPresent(Bool.self, forKey: .showReasoning) ?? d.showReasoning,
             skillIDs: try c.decodeIfPresent(Set<UUID>.self, forKey: .skillIDs) ?? d.skillIDs,
             mcpServerIDs: try c.decodeIfPresent(Set<UUID>.self, forKey: .mcpServerIDs) ?? d.mcpServerIDs,
             allowCLITools: try c.decodeIfPresent(Bool.self, forKey: .allowCLITools) ?? d.allowCLITools,

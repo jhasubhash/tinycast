@@ -6,6 +6,7 @@ struct ChatTranscriptView: View {
     @Environment(\.metrics) private var metrics
     let messages: [ChatMessage]
     let status: String?
+    let showReasoning: Bool
     let usage: AIUsage?
     /// Cleared when the reader scrolls up, so a streaming reply stops dragging them back down.
     @State private var followsTail = true
@@ -27,6 +28,7 @@ struct ChatTranscriptView: View {
                     ForEach(messages) { message in
                         ChatMessageView(
                             message: message,
+                            showReasoning: showReasoning,
                             status: message.id == messages.last?.id ? status : nil
                         )
                         .id(message.id)
@@ -110,6 +112,7 @@ private struct ChatMessageView: View {
 
     @Environment(\.metrics) private var metrics
     let message: ChatMessage
+    let showReasoning: Bool
     let status: String?
 
     @State private var hovered = false
@@ -154,12 +157,13 @@ private struct ChatMessageView: View {
     }
 
     @ViewBuilder private var content: some View {
+        let showsReasoning = showReasoning && !message.reasoning.isEmpty
         if message.text.isEmpty, message.searches.isEmpty, message.toolUses.isEmpty,
-            message.state == .streaming
+            !showsReasoning, message.state == .streaming
         {
             HStack(spacing: metrics.spacing.sm) {
                 ProgressView().controlSize(.small)
-                if let status { Text(status).foregroundStyle(.secondary) }
+                Text(status ?? "Thinking…").foregroundStyle(.secondary)
             }
             .padding(metrics.spacing.md)
         } else {
@@ -194,6 +198,11 @@ private struct ChatMessageView: View {
                     }
                 }
             }
+            if showReasoning, !message.reasoning.isEmpty {
+                ChatReasoningView(
+                    reasoning: message.reasoning,
+                    thinking: message.state == .streaming && message.text.isEmpty)
+            }
             if !message.text.isEmpty || !message.searches.isEmpty || !message.toolUses.isEmpty {
                 rendered
             }
@@ -217,6 +226,45 @@ private struct ChatMessageView: View {
             }
         } else {
             Text(message.text)
+        }
+    }
+}
+
+/// The model's live reasoning: streamed open while it thinks, folded away once the answer begins.
+private struct ChatReasoningView: View {
+    @Environment(\.metrics) private var metrics
+    let reasoning: String
+    let thinking: Bool
+    @State private var expanded = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: metrics.spacing.xs) {
+            Button {
+                withAnimation(.easeOut(duration: Theme.Duration.hover)) { expanded.toggle() }
+            } label: {
+                HStack(spacing: metrics.spacing.xs) {
+                    if thinking {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                    }
+                    Text(thinking ? "Thinking…" : "Reasoning")
+                }
+                .font(metrics.typography.rowTrailing)
+                .foregroundStyle(Theme.Colors.textTertiary)
+            }
+            .buttonStyle(.plain)
+            if expanded {
+                Text(reasoning)
+                    .font(metrics.typography.rowTrailing)
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        // The answer starting is the cue to fold the thinking away; the reader can reopen it.
+        .onChange(of: thinking) { _, nowThinking in
+            if !nowThinking { withAnimation(.easeOut(duration: Theme.Duration.hover)) { expanded = false } }
         }
     }
 }

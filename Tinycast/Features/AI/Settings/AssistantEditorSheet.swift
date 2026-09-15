@@ -106,6 +106,7 @@ struct AssistantEditorSheet: View {
                 modelLabel: { Text("Model") },
                 effortLabel: { Text("Reasoning effort") })
             Toggle("Web search", isOn: $draft.webSearch)
+            Toggle("Stream reasoning", isOn: $draft.showReasoning)
         } header: {
             Text("Model")
         } footer: {
