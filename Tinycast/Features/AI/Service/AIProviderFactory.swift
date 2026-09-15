@@ -53,6 +53,12 @@ enum AIProviderFactory {
             }
             return try installedAI.provider(
                 kind: .openCode, model: model, effort: effort, cliTools: cliTools)
+        case .copilot(let model, let effort):
+            guard settings.enabledInstalledProviders.contains(.copilot) else {
+                throw AIProviderError.unavailable("Copilot is disabled in AI Settings.")
+            }
+            return try installedAI.provider(
+                kind: .copilot, model: model, effort: effort, cliTools: cliTools)
         case .api(let connectionID, let model, let effort):
             guard let connection = settings.connection(id: connectionID) else {
                 throw AIProviderError.unavailable("Choose an API connection in Settings.")

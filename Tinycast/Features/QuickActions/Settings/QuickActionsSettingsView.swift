@@ -171,7 +171,9 @@ struct QuickActionsSettingsView: View {
                 select: store.select,
                 modelLabel: {
                     SettingsRowTitle(.quickActionsModel, "Model")
-                    Text("Used by every action without a model of its own, and by Translate when \u{201C}Translate with AI\u{201D} is on.")
+                    Text(
+                        "Used by every action without a model of its own, and by Translate when "
+                            + "\u{201C}Translate with AI\u{201D} is on.")
                 },
                 effortLabel: {
                     SettingsRowTitle(.quickActionsModel, "Reasoning effort")
@@ -342,7 +344,7 @@ struct QuickActionsSettingsView: View {
         {
             unavailable.insert(.codex)
         }
-        for kind in [InstalledAIKind.claude, .openCode] {
+        for kind in [InstalledAIKind.claude, .openCode, .copilot] {
             let phase = core.installedAI.status(for: kind).phase
             guard
                 !aiSettings.enabledInstalledProviders.contains(kind)

@@ -112,7 +112,7 @@ struct AISettingsView: View {
     private var providerSummary: String {
         var providers: [String] = []
         if subscription.isConnected { providers.append("Codex") }
-        for kind in [InstalledAIKind.claude, .openCode]
+        for kind in [InstalledAIKind.claude, .openCode, .copilot]
         where installedAI.status(for: kind).isReady {
             providers.append(kind.title)
         }
@@ -268,6 +268,7 @@ struct AISettingsView: View {
             }
             installedConnection(.claude)
             installedConnection(.openCode)
+            installedConnection(.copilot)
         } header: {
             SettingsSectionHeader(.aiInstalledAI)
         } footer: {
@@ -510,7 +511,7 @@ struct AISettingsView: View {
             codexModels: enabledProviders.contains(.codex) ? subscription.models : [],
             isUnavailable: !enabledProviders.contains(.codex) || subscription.phase == .signedOut
                 || subscription.phase.isUnavailable)
-        for kind in [InstalledAIKind.claude, .openCode] {
+        for kind in [InstalledAIKind.claude, .openCode, .copilot] {
             let status = installedAI.status(for: kind)
             settings.reconcile(
                 installed: kind,

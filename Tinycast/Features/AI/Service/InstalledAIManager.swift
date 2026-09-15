@@ -24,9 +24,9 @@ final class InstalledAIManager {
     }
 
     @discardableResult
-    func refresh(enabledKinds: Set<InstalledAIKind> = [.claude, .openCode]) -> Task<Void, Never> {
+    func refresh(enabledKinds: Set<InstalledAIKind> = [.claude, .openCode, .copilot]) -> Task<Void, Never> {
         var tasks: [Task<Void, Never>] = []
-        for kind in [InstalledAIKind.claude, .openCode] {
+        for kind in [InstalledAIKind.claude, .openCode, .copilot] {
             if enabledKinds.contains(kind) {
                 tasks.append(refresh(kind: kind))
             } else {
@@ -54,7 +54,7 @@ final class InstalledAIManager {
 
     func ensure(enabledKinds: Set<InstalledAIKind>) -> Task<Void, Never> {
         var tasks: [Task<Void, Never>] = []
-        for kind in [InstalledAIKind.claude, .openCode] {
+        for kind in [InstalledAIKind.claude, .openCode, .copilot] {
             guard enabledKinds.contains(kind) else {
                 stop(kind: kind)
                 continue
@@ -145,6 +145,24 @@ final class InstalledAIManager {
                 InstalledAIStatus(
                     phase: models.status == 0 && !catalog.isEmpty ? .ready : .signInRequired,
                     version: version, executable: executable, models: catalog)
+            )
+        case .copilot:
+            // No auth subcommand beyond `--version`; a logged-in user in its config means ready.
+            let configURL = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".copilot/config.json")
+            let configData = try? Data(contentsOf: configURL)
+            let signedIn: Bool = {
+                guard let users = InstalledAIModel.parseCopilotConfig(configData)?["loggedInUsers"]
+                    as? [Any]
+                else { return false }
+                return !users.isEmpty
+            }()
+            let models = InstalledAIModel.copilotCatalog(configJSON: configData)
+            return (
+                kind,
+                InstalledAIStatus(
+                    phase: signedIn ? .ready : .signInRequired,
+                    version: version, executable: executable, models: signedIn ? models : [])
             )
         case .codex:
             return (kind, InstalledAIStatus(phase: .idle))

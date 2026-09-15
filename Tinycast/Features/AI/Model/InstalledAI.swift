@@ -4,6 +4,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
     case codex
     case claude
     case openCode
+    case copilot
 
     var id: String { rawValue }
 
@@ -12,6 +13,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .codex: return "Codex"
         case .claude: return "Claude"
         case .openCode: return "OpenCode"
+        case .copilot: return "Copilot"
         }
     }
 
@@ -20,6 +22,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .codex: return "codex"
         case .claude: return "claude"
         case .openCode: return "opencode"
+        case .copilot: return "copilot"
         }
     }
 
@@ -28,6 +31,8 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .codex: return URL(string: "https://developers.openai.com/codex/cli")!
         case .claude: return URL(string: "https://code.claude.com/docs/en/setup")!
         case .openCode: return URL(string: "https://opencode.ai/docs")!
+        case .copilot:
+            return URL(string: "https://docs.github.com/copilot/how-tos/set-up/install-copilot-cli")!
         }
     }
 
@@ -41,6 +46,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .codex: return .codex
         case .claude: return .claude
         case .openCode: return .openCode
+        case .copilot: return .copilot
         }
     }
 
@@ -49,6 +55,7 @@ enum InstalledAIKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .codex: return "codex login"
         case .claude: return "claude auth login"
         case .openCode: return "opencode auth login"
+        case .copilot: return "copilot  (then run it and sign in with GitHub)"
         }
     }
 }
@@ -60,6 +67,7 @@ extension AIModelSource {
         case .codex: return .codex
         case .claude: return .claude
         case .openCode: return .openCode
+        case .copilot: return .copilot
         case .appleIntelligence, .api: return nil
         }
     }
@@ -124,6 +132,24 @@ struct InstalledAIModel: Equatable, Identifiable, Sendable {
                 id: id, name: id,
                 efforts: efforts.map { ChatGPTSubscription.Effort(id: $0, detail: nil) })
         }
+    }
+
+    /// Copilot has no headless model-list command, so the catalog is `auto` plus the models the CLI's
+    /// own `~/.copilot/config.json` shows the user has used — grounded in their account, not hardcoded.
+    static func copilotCatalog(configJSON: Data?) -> [InstalledAIModel] {
+        var ids = ["auto"]
+        if let recent = parseCopilotConfig(configJSON)?["recentModelIds"] as? [String] {
+            for id in recent where !ids.contains(id) { ids.append(id) }
+        }
+        // A couple of well-known ones stay present even on a fresh install.
+        for id in ["claude-sonnet-5", "claude-opus-4.8"] where !ids.contains(id) { ids.append(id) }
+        return ids.map { InstalledAIModel(id: $0, name: $0 == "auto" ? "Auto" : $0) }
+    }
+
+    /// `~/.copilot/config.json` is JSONC — leading `//` comments — so parse from the first `{`.
+    static func parseCopilotConfig(_ data: Data?) -> [String: Any]? {
+        guard let data, let brace = data.firstIndex(of: UInt8(ascii: "{")) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data[brace...]) as? [String: Any]
     }
 
     private static func effortOrder(_ lhs: String, _ rhs: String) -> Bool {

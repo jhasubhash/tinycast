@@ -80,4 +80,29 @@ struct AICLIToolConfig: Sendable, Equatable {
         }
         return entries
     }
+
+    /// GitHub Copilot CLI's `--additional-mcp-config` payload — `{"mcpServers":{…}}` with a `type` of
+    /// `local` (stdio) or `http`, mirroring `~/.copilot/mcp-config.json`.
+    var copilotMCPConfigJSON: String {
+        var entries: [String: Any] = [:]
+        for server in servers {
+            switch server.transport {
+            case .stdio(let command, let arguments):
+                var entry: [String: Any] = [
+                    "type": "local", "command": command, "args": arguments, "tools": ["*"]
+                ]
+                if !server.environment.isEmpty { entry["env"] = server.environment }
+                entries[server.slug] = entry
+            case .http(let url, let headerName):
+                var entry: [String: Any] = ["type": "http", "url": url, "tools": ["*"]]
+                if !server.headerValue.isEmpty { entry["headers"] = [headerName: server.headerValue] }
+                entries[server.slug] = entry
+            }
+        }
+        guard let data = try? JSONSerialization.data(
+            withJSONObject: ["mcpServers": entries], options: [.sortedKeys]),
+            let json = String(data: data, encoding: .utf8)
+        else { return #"{"mcpServers":{}}"# }
+        return json
+    }
 }

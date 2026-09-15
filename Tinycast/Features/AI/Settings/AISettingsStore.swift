@@ -180,6 +180,9 @@ final class AISettingsStore {
         case .openCode:
             defaultModel = .openCode(
                 model: replacement.id, effort: replacement.resolvedEffort(nil))
+        case .copilot:
+            defaultModel = .copilot(
+                model: replacement.id, effort: replacement.resolvedEffort(nil))
         case .codex: break
         }
     }
@@ -204,7 +207,9 @@ final class AISettingsStore {
         guard let source = defaultModel?.source else { return }
         let matches =
             switch (kind, source) {
-            case (.codex, .codex), (.claude, .claude), (.openCode, .openCode): true
+            case (.codex, .codex), (.claude, .claude), (.openCode, .openCode),
+                (.copilot, .copilot):
+                true
             default: false
             }
         guard matches else { return }

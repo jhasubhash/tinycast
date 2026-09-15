@@ -16,6 +16,7 @@ enum InstalledAIStreamDecoder {
         case .openCode: return openCode(object, type: type)
         case .claude: return claude(object, type: type)
         case .codex: return InstalledAIStreamFrame()
+        case .copilot: return copilot(object, type: type)
         }
     }
 
@@ -40,6 +41,31 @@ enum InstalledAIStreamDecoder {
             frame.completed = true
         case "error":
             frame.error = message(in: object) ?? "OpenCode could not finish the response."
+        default:
+            break
+        }
+        return frame
+    }
+
+    /// Copilot's `--output-format json` is JSONL: incremental text arrives as `assistant.message_delta`
+    /// (`data.deltaContent`), and a top-level `result` line ends the turn.
+    private static func copilot(
+        _ object: [String: Any], type: String
+    ) -> InstalledAIStreamFrame {
+        var frame = InstalledAIStreamFrame()
+        switch type {
+        case "assistant.message_delta":
+            if let data = object["data"] as? [String: Any],
+                let delta = data["deltaContent"] as? String, !delta.isEmpty
+            {
+                frame.events = [.text(delta)]
+            }
+        case "result":
+            frame.sessionID = object["sessionId"] as? String
+            if let code = integer(object["exitCode"]), code != 0 {
+                frame.error = "Copilot exited with an error."
+            }
+            frame.completed = true
         default:
             break
         }
