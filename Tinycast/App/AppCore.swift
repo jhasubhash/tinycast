@@ -477,16 +477,19 @@ final class AppCore {
         return Task { for task in tasks { await task.value } }
     }
 
-    func aiProvider() throws -> any AIProvider {
+    func aiProvider(cliTools: AICLIToolConfig? = nil) throws -> any AIProvider {
         try AIProviderFactory.make(
-            settings: aiSettings, subscription: chatGPTSubscription, installedAI: installedAI)
+            settings: aiSettings, subscription: chatGPTSubscription, installedAI: installedAI,
+            cliTools: cliTools)
     }
 
     /// Chat's route for a specific selection — an Assistant's chosen model, distinct from the default.
-    func aiProvider(for selection: AIModelSelection) throws -> any AIProvider {
+    func aiProvider(for selection: AIModelSelection, cliTools: AICLIToolConfig? = nil) throws
+        -> any AIProvider
+    {
         try AIProviderFactory.make(
             selection: selection, settings: aiSettings, subscription: chatGPTSubscription,
-            installedAI: installedAI)
+            installedAI: installedAI, cliTools: cliTools)
     }
 
     /// Permissive guardrails: the text transformed is the reader's own, which `.default` refuses.

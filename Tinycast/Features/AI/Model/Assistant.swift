@@ -22,6 +22,9 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
     var skillIDs: Set<UUID>
     /// Enabled MCP servers — a subset of the library. Tools offered on API routes only.
     var mcpServerIDs: Set<UUID>
+    /// Opt-in: let an installed Claude/OpenCode CLI route run this assistant's MCP servers as its own
+    /// tools (a generated `--mcp-config`). Off by default — it un-sandboxes native CLI tool execution.
+    var allowCLITools: Bool
     var opensTo: AIOpensTo
     var newChatAfter: AINewChatAfter
     var retention: AIRetention
@@ -47,6 +50,7 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
         webSearch: Bool = false,
         skillIDs: Set<UUID> = [],
         mcpServerIDs: Set<UUID> = [],
+        allowCLITools: Bool = false,
         opensTo: AIOpensTo = .recent,
         newChatAfter: AINewChatAfter = .fiveMinutes,
         retention: AIRetention = .forever,
@@ -67,6 +71,7 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
         self.webSearch = webSearch
         self.skillIDs = skillIDs
         self.mcpServerIDs = mcpServerIDs
+        self.allowCLITools = allowCLITools
         self.opensTo = opensTo
         self.newChatAfter = newChatAfter
         self.retention = retention
@@ -75,6 +80,37 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
         self.positions = positions
         self.width = width
         self.order = order
+    }
+
+    /// Decode-tolerant: a field an older saved assistant lacks falls back to its default rather than
+    /// failing the whole decode — one missing key must never drop every saved assistant.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = Assistant()
+        self.init(
+            id: try c.decodeIfPresent(UUID.self, forKey: .id) ?? d.id,
+            provider: try c.decodeIfPresent(AssistantProvider.self, forKey: .provider) ?? d.provider,
+            name: try c.decodeIfPresent(String.self, forKey: .name) ?? d.name,
+            symbol: try c.decodeIfPresent(String.self, forKey: .symbol) ?? d.symbol,
+            tint: try c.decodeIfPresent(AssistantTint.self, forKey: .tint) ?? d.tint,
+            systemPrompt: try c.decodeIfPresent(String.self, forKey: .systemPrompt) ?? d.systemPrompt,
+            systemPromptEnabled: try c.decodeIfPresent(Bool.self, forKey: .systemPromptEnabled)
+                ?? d.systemPromptEnabled,
+            model: try c.decodeIfPresent(AIModelSelection.self, forKey: .model) ?? d.model,
+            webSearch: try c.decodeIfPresent(Bool.self, forKey: .webSearch) ?? d.webSearch,
+            skillIDs: try c.decodeIfPresent(Set<UUID>.self, forKey: .skillIDs) ?? d.skillIDs,
+            mcpServerIDs: try c.decodeIfPresent(Set<UUID>.self, forKey: .mcpServerIDs) ?? d.mcpServerIDs,
+            allowCLITools: try c.decodeIfPresent(Bool.self, forKey: .allowCLITools) ?? d.allowCLITools,
+            opensTo: try c.decodeIfPresent(AIOpensTo.self, forKey: .opensTo) ?? d.opensTo,
+            newChatAfter: try c.decodeIfPresent(AINewChatAfter.self, forKey: .newChatAfter)
+                ?? d.newChatAfter,
+            retention: try c.decodeIfPresent(AIRetention.self, forKey: .retention) ?? d.retention,
+            ephemeral: try c.decodeIfPresent(Bool.self, forKey: .ephemeral) ?? d.ephemeral,
+            seedPrompt: try c.decodeIfPresent(String.self, forKey: .seedPrompt) ?? d.seedPrompt,
+            positions: try c.decodeIfPresent([String: [Double]].self, forKey: .positions)
+                ?? d.positions,
+            width: try c.decodeIfPresent(CGFloat.self, forKey: .width) ?? d.width,
+            order: try c.decodeIfPresent(Int.self, forKey: .order) ?? d.order)
     }
 
     var isPlugin: Bool {

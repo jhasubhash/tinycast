@@ -84,7 +84,9 @@ final class InstalledAIManager {
         statuses[kind] = InstalledAIStatus()
     }
 
-    func provider(kind: InstalledAIKind, model: String, effort: String?) throws -> any AIProvider {
+    func provider(
+        kind: InstalledAIKind, model: String, effort: String?, cliTools: AICLIToolConfig? = nil
+    ) throws -> any AIProvider {
         guard kind != .codex else {
             throw AIProviderError.unavailable("Codex is handled by its app-server connection.")
         }
@@ -97,7 +99,7 @@ final class InstalledAIManager {
         }
         return InstalledCLIProvider(
             kind: kind, executable: status.executable, model: model, effort: effort,
-            workspace: workspace)
+            workspace: workspace, toolConfig: cliTools)
     }
 
     nonisolated private static func probe(

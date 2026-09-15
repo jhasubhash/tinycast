@@ -18,6 +18,7 @@ struct AssistantTests {
 
     static func main() {
         assistantRoundTripsThroughCodable()
+        assistantDecodesLegacyJSONMissingFields()
         providerRoundTripsBothCases()
         placementReadsAndWrites()
         skillRoundTripsThroughCodable()
@@ -48,6 +49,21 @@ struct AssistantTests {
         expect(decoded == assistant, "an assistant round-trips through Codable unchanged")
         expect(decoded.model == .appleIntelligence, "the chosen model survives the round trip")
         expect(decoded.width == 640, "a per-assistant width survives")
+    }
+
+    /// A saved assistant from before a field existed must still decode — a missing key falling back to
+    /// its default, never failing the whole decode (which would drop every saved assistant).
+    static func assistantDecodesLegacyJSONMissingFields() {
+        // Only id and name — every other field is absent, as an early build would have written none.
+        let legacy = #"{"id":"11111111-1111-1111-1111-111111111111","name":"Legacy"}"#
+        guard let decoded = try? JSONDecoder().decode(Assistant.self, from: Data(legacy.utf8)) else {
+            expect(false, "a legacy assistant JSON missing new fields still decodes")
+            return
+        }
+        expect(decoded.name == "Legacy", "the present fields decode")
+        expect(decoded.allowCLITools == false, "a missing allowCLITools falls back to its default")
+        expect(decoded.opensTo == .recent, "a missing enum field falls back to its default")
+        expect(decoded.symbol == "sparkles", "a missing string field falls back to its default")
     }
 
     static func providerRoundTripsBothCases() {

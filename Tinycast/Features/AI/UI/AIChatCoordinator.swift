@@ -281,8 +281,15 @@ final class AIChatCoordinator {
     }
 
     private func effectiveProvider() throws -> any AIProvider {
-        if let model = activeAssistant?.model { return try core.aiProvider(for: model) }
-        return try core.aiProvider()
+        let assistant = activeAssistant
+        // The opt-in only builds a config when the assistant allows CLI tools and enables servers;
+        // nil keeps every other route (and the default bar) exactly as before.
+        let cliTools =
+            assistant?.allowCLITools == true
+            ? core.mcpCoordinator.cliToolConfig(allowed: assistant?.mcpServerIDs ?? [])
+            : nil
+        if let model = assistant?.model { return try core.aiProvider(for: model, cliTools: cliTools) }
+        return try core.aiProvider(cliTools: cliTools)
     }
     /// What the selected model can take; the footer offers only what applies.
     var capabilities: AIModelCapabilities {

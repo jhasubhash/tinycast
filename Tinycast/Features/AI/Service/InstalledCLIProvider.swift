@@ -5,11 +5,12 @@ struct InstalledCLIProvider: AIProvider {
 
     @MainActor
     init(
-        kind: InstalledAIKind, executable: URL?, model: String, effort: String?, workspace: URL
+        kind: InstalledAIKind, executable: URL?, model: String, effort: String?, workspace: URL,
+        toolConfig: AICLIToolConfig? = nil
     ) {
         runner = InstalledCLITurnRunner(
             kind: kind, executable: executable, model: model, effort: effort,
-            workspace: workspace)
+            workspace: workspace, toolConfig: toolConfig)
     }
 
     func stream(_ request: AIRequest) -> AIProviderStream {
@@ -47,14 +48,18 @@ private final class InstalledCLITurnRunner {
     private var openCodeSessionID: String?
     private var activeExecutable: URL?
 
+    private let toolConfig: AICLIToolConfig?
+
     init(
-        kind: InstalledAIKind, executable: URL?, model: String, effort: String?, workspace: URL
+        kind: InstalledAIKind, executable: URL?, model: String, effort: String?, workspace: URL,
+        toolConfig: AICLIToolConfig?
     ) {
         self.kind = kind
         configuredExecutable = executable
         self.model = model
         self.effort = effort
         self.workspace = workspace
+        self.toolConfig = toolConfig
     }
 
     nonisolated func stream(_ request: AIRequest) -> AIProviderStream {
@@ -160,6 +165,27 @@ private final class InstalledCLITurnRunner {
     private var arguments: [String] {
         switch kind {
         case .claude:
+            if let toolConfig {
+                // Opt-in: the assistant's own MCP servers as Claude Code's tools. An `--allowedTools`
+                // allowlist (not bypass) scopes it to those servers — never Bash or file access.
+                var result = [
+                    "-p",
+                    "--model", model,
+                    "--input-format", "text",
+                    "--output-format", "stream-json",
+                    "--verbose",
+                    "--include-partial-messages",
+                    "--no-session-persistence",
+                    "--disable-slash-commands",
+                    "--strict-mcp-config",
+                    "--mcp-config", toolConfig.claudeMCPConfigJSON,
+                    "--allowedTools", toolConfig.allowedTools.joined(separator: " "),
+                    "--no-chrome",
+                    "--max-turns", String(toolConfig.maxTurns)
+                ]
+                if let effort { result += ["--effort", effort] }
+                return result
+            }
             var result = [
                 "-p",
                 "--model", model,
@@ -221,7 +247,8 @@ private final class InstalledCLITurnRunner {
                     && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             })
         else { return nil }
-        var sections = [Self.safetyInstructions]
+        // The "do not invoke tools" instruction is dropped once tools are the point of the turn.
+        var sections = toolConfig == nil ? [Self.safetyInstructions] : []
         if let instructions = request.instructions?.trimmingCharacters(in: .whitespacesAndNewlines),
             !instructions.isEmpty
         {

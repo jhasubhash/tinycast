@@ -156,10 +156,19 @@ struct AssistantEditorSheet: View {
                     Toggle(server.title, isOn: mcpBinding(server.id))
                 }
             }
+            Toggle(isOn: $draft.allowCLITools) {
+                Text("Allow CLI tools (advanced)")
+                Text(
+                    "Let an installed Claude or Codex CLI model run the enabled servers as its own "
+                        + "tools. Scoped to those servers only — no shell or file access — but it does "
+                        + "run native code with your CLI login's privileges.")
+            }
         } header: {
             Text("MCP servers")
         } footer: {
-            Text("Only the servers enabled here offer their tools to this assistant.")
+            Text(
+                "Only the servers enabled here offer their tools to this assistant. CLI tools apply to "
+                    + "the Claude and Codex CLI routes; API models (OpenAI/Anthropic/…) always call tools.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
