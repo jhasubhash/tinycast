@@ -5,6 +5,7 @@ import Foundation
 @Observable
 final class HotKeyManager {
     var onTogglePalette: (() -> Void)?
+    var onToggleAIBar: (() -> Void)?
     /// The launcher's own command funnel, so a shortcut and a palette row run the same thing.
     var onRunCommand: ((CommandID) -> Void)?
     var onRunCustomCommand: ((UUID) -> Void)?
@@ -163,7 +164,7 @@ final class HotKeyManager {
             var set = Set(boundPluginCommandEntryIDs)
             if binding == nil { set.remove(entryID) } else { set.insert(entryID) }
             UserDefaults.standard.set(Array(set), forKey: boundPluginCommandKey)
-        case .togglePalette, .command, .systemAction, .windowCommand:
+        case .togglePalette, .toggleAIBar, .command, .systemAction, .windowCommand:
             break
         }
         candidateActionsCache = nil
@@ -217,6 +218,8 @@ final class HotKeyManager {
         switch action {
         case .togglePalette:
             return "App Launcher"
+        case .toggleAIBar:
+            return "AI Chat Bar"
         case .command(let id):
             return id.name
         case .app(let bundleID), .settingsPane(let bundleID):
@@ -263,6 +266,7 @@ final class HotKeyManager {
         guard allowsAction?(action) ?? true else { return }
         switch action {
         case .togglePalette: onTogglePalette?()
+        case .toggleAIBar: onToggleAIBar?()
         case .command(let id): onRunCommand?(id)
         case .app(let bundleID): AppLauncher.toggle(bundleID: bundleID)
         case .settingsPane(let bundleID): AppLauncher.openSettingsPane(bundleID: bundleID)

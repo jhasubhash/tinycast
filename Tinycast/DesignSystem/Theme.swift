@@ -243,6 +243,8 @@ enum Theme {
         static let settingsReveal: TimeInterval = 0.28
         static let settingsFlash: TimeInterval = 2.0
         static let settingsFlashOut: TimeInterval = 0.6
+        /// The AI bar growing from its composer into the transcript, and shrinking back.
+        static let aiBarResize: TimeInterval = 0.22
     }
 
     /// Motion owned by Tinycast's menus; extension-provided panels keep their own behavior.

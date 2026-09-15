@@ -60,6 +60,23 @@ final class AIChatCoordinator {
             return
         }
         applyOpenPolicy()
+        // The launcher command is the full window, never the bar, whatever a prior summon left.
+        palette.aiBar = false
+        paletteCoordinator.showPalette(mode: .ai)
+    }
+
+    /// The dedicated summon: AI Chat as a floating bar, sharing the launcher's chat and history.
+    func toggleBar() {
+        guard settings.aiEnabled else { return }
+        // A second press closes it, the way every mode command's own toggle does.
+        if paletteCoordinator.isShowing(.ai), palette.aiBar {
+            paletteCoordinator.hidePalette()
+            return
+        }
+        applyOpenPolicy()
+        palette.aiBar = true
+        // Resume opens straight to the transcript; a fresh chat opens as the composer alone.
+        palette.aiBarExpanded = !chat.session.messages.isEmpty
         paletteCoordinator.showPalette(mode: .ai)
     }
 
@@ -98,7 +115,9 @@ final class AIChatCoordinator {
             lastActiveAt: lastActiveAt, now: Date())
         switch decision {
         case .resume:
-            guard !hasTranscript, !hasStaging, let recent else { return }
+            // A chat the user deliberately started stays put across a close; don't reopen the old
+            // one over it. An empty fresh chat is a choice, not the absence of one.
+            guard !chat.startedFresh, !hasTranscript, !hasStaging, let recent else { return }
             chat.open(id: recent.id)
         case .startNew:
             // An empty chat is already new; resetting it would only drop what is staged in it.
@@ -113,13 +132,16 @@ final class AIChatCoordinator {
         do {
             let webSearch = core.aiSettings.webSearchEnabled && capabilities.webSearch
             let address = MCPComposerAddress.parse(input, slugs: core.mcpCoordinator.slugs)
-            return chat.send(
+            let sent = chat.send(
                 address.rest, using: try toolAware(core.aiProvider(), scopedTo: address.slug),
                 webSearch: webSearch,
                 instructions: AIInstructions.compose(
                     userPrompt: core.aiSettings.systemPrompt,
                     isEnabled: core.aiSettings.systemPromptEnabled),
                 contextBudget: contextBudget)
+            // The first message grows the bar past its composer into the transcript.
+            if sent { palette.aiBarExpanded = true }
+            return sent
         } catch {
             chat.report(error.localizedDescription)
             return false
@@ -143,9 +165,11 @@ final class AIChatCoordinator {
     }
 
     func startNewChat() {
-        chat.startNewChat()
+        chat.startNewChat(userInitiated: true)
         // A fresh conversation, not a fresh root: whatever opened chat is still behind it.
         palette.replace(mode: .ai)
+        // The bar shrinks back to the composer; a new chat has no transcript to show.
+        palette.aiBarExpanded = false
     }
 
     func showHistory() {

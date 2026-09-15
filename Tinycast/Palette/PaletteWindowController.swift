@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import QuartzCore
 import SwiftUI
 
 @MainActor
@@ -232,7 +233,12 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     /// A drag re-anchors the session, so the next resize grows from where the user left it.
     func windowDidMove(_ notification: Notification) {
         guard let panel else { return }
-        let moved = CGPoint(x: panel.frame.minX, y: panel.frame.maxY)
+        // The anchor is the bar's top edge. Growing up moves the window's top on resize, so derive
+        // it from the fixed bottom instead — otherwise a resize re-anchors to the expanded top.
+        let frame = panel.frame
+        let top =
+            core.palette.aiBarGrowsUp ? frame.minY + metrics.size.compactHeight : frame.maxY
+        let moved = CGPoint(x: frame.minX, y: top)
         anchor = moved
         guard drag != nil else { return }
         trackDrag(to: moved)
@@ -256,14 +262,14 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         dropGuides.hide()
         guard let panel, let session, session.moved else { return }
         guard session.armed else {
-            core.settings.setPalettePosition(
+            setStoredPosition(
                 anchor.map { PalettePlacement.offset(of: $0, on: session.visibleFrame) },
                 on: session.displayKey)
             return
         }
         anchor = session.home
         positionPanel(panel, collapsed: core.paletteCoordinator.paletteIsCollapsed)
-        core.settings.setPalettePosition(nil, on: session.displayKey)
+        setStoredPosition(nil, on: session.displayKey)
     }
 
     /// Keep the guides on the panel's screen, armed only while a release would snap it home.
@@ -373,7 +379,12 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             guard let character = Self.commandCharacter(from: event) else { return false }
             switch character {
             case ",":
-                self.core.settingsCoordinator.showSettings()
+                // In AI Chat, ⌘, lands on the AI pane the actions menu advertises, not General.
+                if self.core.palette.mode == .ai {
+                    self.core.aiChatCoordinator.showSettings()
+                } else {
+                    self.core.settingsCoordinator.showSettings()
+                }
                 return true
             // Pin. Swallowed on every screen, since ⌘. only ever means cancel to a search field.
             case ".":
@@ -440,10 +451,10 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         return true
     }
 
-    /// Resize to the given state, top edge anchored; applied even while hidden.
+    /// Resize to the given state; the AI bar animates its grow/shrink, everything else snaps.
     func applyCollapsed(_ collapsed: Bool) {
         guard let panel else { return }
-        positionPanel(panel, collapsed: collapsed)
+        positionPanel(panel, collapsed: collapsed, animated: core.palette.aiBar && panel.isVisible)
     }
 
     /// A new width invalidates the placement the cached anchor encoded, so re-resolve it.
@@ -453,14 +464,34 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         positionPanel(panel, collapsed: core.paletteCoordinator.paletteIsCollapsed)
     }
 
-    /// Size to height and place against the session anchor, so the list grows downward.
-    private func positionPanel(_ panel: NSPanel, collapsed: Bool) {
+    /// Size to height and place against the session anchor; the AI bar may grow up instead of down.
+    private func positionPanel(_ panel: NSPanel, collapsed: Bool, animated: Bool = false) {
         guard let anchor = resolveAnchor() else { return }
         let size = metrics.size
         let height = collapsed ? size.compactHeight : size.panelHeight
-        let frame = NSRect(
-            x: anchor.x, y: anchor.y - height, width: size.panelWidth, height: height)
-        panel.setFrame(frame, display: true)
+        let growsUp = growsUpward(anchor: anchor)
+        // The view docks the composer at the bottom when the bar grows up, so publish the direction.
+        core.palette.aiBarGrowsUp = growsUp
+        // Growing up keeps the bar's bottom edge fixed; every other placement keeps its top.
+        let originY = growsUp ? anchor.y - size.compactHeight : anchor.y - height
+        let frame = NSRect(x: anchor.x, y: originY, width: size.panelWidth, height: height)
+        guard animated else {
+            panel.setFrame(frame, display: true)
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Theme.Duration.aiBarResize
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(frame, display: true)
+        }
+    }
+
+    /// An AI bar placed low grows into the space above it, so its transcript never runs off-screen.
+    private func growsUpward(anchor: CGPoint) -> Bool {
+        guard core.palette.aiBar,
+            let visibleFrame = (panel?.screen ?? targetScreen())?.visibleFrame
+        else { return false }
+        return anchor.y - metrics.size.panelHeight < visibleFrame.minY
     }
 
     /// The display to anchor to; never `NSScreen.main`, which follows the focused window.
@@ -476,9 +507,23 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         return resolved
     }
 
+    /// The AI bar keeps its own placement, so dragging one never moves the launcher's, or the reverse.
+    private func storedPosition(on display: String) -> CGPoint? {
+        core.palette.aiBar
+            ? core.settings.aiBarPosition(on: display) : core.settings.palettePosition(on: display)
+    }
+
+    private func setStoredPosition(_ offset: CGPoint?, on display: String) {
+        if core.palette.aiBar {
+            core.settings.setAIBarPosition(offset, on: display)
+        } else {
+            core.settings.setPalettePosition(offset, on: display)
+        }
+    }
+
     /// This display's own corner, unless too little of the bar would stay grabbable.
     private func restoredAnchor(on screen: NSScreen) -> CGPoint? {
-        guard let offset = core.settings.palettePosition(on: screen.displayKey) else { return nil }
+        guard let offset = storedPosition(on: screen.displayKey) else { return nil }
         return PalettePlacement.restored(
             PalettePlacement.anchor(for: offset, on: screen.visibleFrame),
             graspable: CGSize(width: metrics.size.panelWidth, height: metrics.size.compactHeight),

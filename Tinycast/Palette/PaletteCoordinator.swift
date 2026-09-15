@@ -102,7 +102,9 @@ final class PaletteCoordinator {
 
     /// True for the slim compact bar: compact on, launcher root, empty, not overflowed.
     var paletteIsCollapsed: Bool {
-        settings.compactMode
+        // The AI bar collapses to the composer until its transcript has grown; nothing else applies.
+        if palette.aiBar { return !palette.aiBarExpanded }
+        return settings.compactMode
             && !palette.forceExpanded
             && palette.mode == .launcher
             && palette.query.trimmingCharacters(in: .whitespaces).isEmpty

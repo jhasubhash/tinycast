@@ -45,6 +45,10 @@ struct RootPaletteView: View {
     /// Compact vs. full; the source of truth is on `AppCore`, so the two can't disagree.
     private var isCollapsed: Bool { core.paletteCoordinator.paletteIsCollapsed }
 
+    /// The low-placed AI bar docks its composer at the bottom with the transcript above it, so the
+    /// bar the user typed in stays put and the chat grows upward into the space over it.
+    private var composeAtBottom: Bool { vm.aiBar && vm.aiBarGrowsUp }
+
     /// A plugin surface takes the whole panel: the palette shows no header, footer or drag strip
     /// over it, and the plugin owns its own chrome.
     private var pluginSurfaceActive: Bool {
@@ -238,6 +242,9 @@ struct RootPaletteView: View {
         let showActionGroup =
             (count > 0 || vm.mode.isArgumentForm || screen.actsWithoutRows)
             && screen.hasPrimaryAction(at: sel)
+        // Docked at the bottom, the whole stack mirrors: composer to the bottom, footer to the top.
+        let headerEdge: VerticalEdge = composeAtBottom ? .bottom : .top
+        let footerEdge: VerticalEdge = composeAtBottom ? .top : .bottom
 
         // One header position, so focus survives the swap. See docs/features/palette.md.
         return keyHandlers(
@@ -252,15 +259,15 @@ struct RootPaletteView: View {
                 // A plugin surface owns the whole panel, so collapse the header to nothing — but keep
                 // it mounted. Tearing the search field down loses its editor, and the plugin's list
                 // would then receive no keys once the surface pops. See the note on `headerField`.
-                .safeAreaInset(edge: .top, spacing: 0) {
+                .safeAreaInset(edge: headerEdge, spacing: 0) {
                     header
                         .frame(height: pluginSurfaceActive ? 0 : nil, alignment: .top)
                         .opacity(pluginSurfaceActive ? 0 : 1)
                         .clipped()
                         .allowsHitTesting(!pluginSurfaceActive)
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if !isCollapsed, !pluginSurfaceActive {
+                .safeAreaInset(edge: footerEdge, spacing: 0) {
+                    if !isCollapsed, !pluginSurfaceActive, !composeAtBottom {
                         bottomBar(
                             pillLabel: screen.primaryActionTitle, showActionGroup: showActionGroup,
                             formPrimaryShortcut: isExtensionForm,
@@ -436,6 +443,8 @@ struct RootPaletteView: View {
                 // A control's own list owns every navigation key while it is up.
                 if vm.isControlListOpen { return .ignored }
                 if isCollapsed {
+                    // The AI bar has no list to reveal; only the launcher bar expands on Down.
+                    if vm.aiBar { return .ignored }
                     // The compact bar shows no selection, so Down reveals the list's first row.
                     vm.selection = 0
                     core.paletteCoordinator.expandFromCompact()
@@ -551,6 +560,25 @@ struct RootPaletteView: View {
                 toggleActions()
                 return .handled
             }
+            // AI Chat's own ⌘ chords, ahead of the row-shortcut handler that reads ⌘Y / ⇧⌘C too.
+            .onKeyPress(phases: .down) { press in
+                guard vm.mode == .ai, press.modifiers.contains(.command),
+                    press.modifiers.isDisjoint(with: [.option, .control])
+                else { return .ignored }
+                let shift = press.modifiers.contains(.shift)
+                let match = { ASCIIKeyboardLayout.matches(press.key, character: $0) }
+                if !shift, match("n") {
+                    core.aiChatCoordinator.startNewChat()
+                } else if shift, match("c") {
+                    core.aiChatCoordinator.copyLastResponse()
+                } else if !shift, match("y") {
+                    core.aiChatCoordinator.showHistory()
+                } else {
+                    return .ignored
+                }
+                if menuOpen { closeMenus() }
+                return .handled
+            }
             // The screen answers row chords; a bare backspace is intercepted in `sendEvent`.
             .onKeyPress(phases: .down) { press in
                 let isDeleteKey = press.key == .delete || press.key == .deleteForward
@@ -616,7 +644,7 @@ struct RootPaletteView: View {
             // Matches the list rows and section headers' own indent below.
             headerGutter(width: metrics.spacing.md * 2)
             // Every sub-screen leaves the same way, so the slot reads the same on all of them.
-            if vm.mode != .launcher {
+            if vm.mode != .launcher, !vm.aiBar {
                 HeaderBackButton(help: backHelp, action: goBack)
             } else {
                 Image(systemName: vm.mode.systemImage)
@@ -650,7 +678,7 @@ struct RootPaletteView: View {
                     isOpen: openMenu == .fileSearchFilter, help: "Filter by type  ⌘P",
                     action: toggleFileSearchFilter)
             }
-            if !isCollapsed, vm.mode == .ai {
+            if vm.mode == .ai {
                 headerGutter(width: metrics.spacing.md)
                 AIModelButton(
                     title: core.aiChatCoordinator.selectedModelTitle,
@@ -664,6 +692,11 @@ struct RootPaletteView: View {
                         isOpen: openMenu == .aiReasoning,
                         action: toggleAIReasoning)
                 }
+            }
+            // Docked low, the composer owns the bottom, so the actions ⌘K sits by the model name.
+            if composeAtBottom, !isCollapsed {
+                headerGutter(width: metrics.spacing.md)
+                AIActionsButton(isOpen: openMenu == .actions, action: toggleActions)
             }
             // Compact pins favorites beside the field; expanded shows them as rows.
             if isCollapsed, settings.showFavoritesInCompactMode,
@@ -692,7 +725,7 @@ struct RootPaletteView: View {
         }
         // Identical metrics in both states, so typing can't move the search bar.
         .frame(height: metrics.size.headerHeight)
-        .padding(.top, metrics.size.headerPadding)
+        .padding(composeAtBottom ? .bottom : .top, metrics.size.headerPadding)
         .frame(maxWidth: .infinity)
         // Set after the show, so the field it names is focused rather than the search field.
         .onChange(of: vm.pendingArgumentEntryID) { focusPendingArgument() }
@@ -1168,15 +1201,18 @@ struct RootPaletteView: View {
     }
 
     private func activateSelection() {
-        // Nothing is visibly selected when collapsed, so launch via ⌘1–⌘5 or typing.
-        guard !isCollapsed else { return }
+        let screen = screen
+        // The launcher bar has no selection to launch; the AI bar sends its composer instead.
+        if isCollapsed {
+            if vm.aiBar { screen.activate(at: selection(in: screen)) }
+            return
+        }
         // An unfilled field blocks the launch; focus it instead of acting on a half-typed row.
         if let incomplete = headerAccessory?.firstIncompleteField {
             argumentFocused = incomplete
             searchFocused = false
             return
         }
-        let screen = screen
         screen.activate(at: selection(in: screen))
     }
 

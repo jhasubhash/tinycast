@@ -124,6 +124,14 @@ struct AISettingsView: View {
     private var chatSection: some View {
         @Bindable var settings = settings
         return Section {
+            SettingsRow(
+                title: "Floating bar",
+                subtitle: "A shortcut that summons AI Chat as a bar you can place anywhere — it "
+                    + "shares this chat and history.",
+                subtitleLineLimit: 2, anchor: .aiChat
+            ) {
+                ShortcutRecorder(action: .toggleAIBar)
+            }
             Toggle(isOn: $settings.webSearchEnabled) {
                 SettingsRowTitle(.aiChat, "Web search")
                 Text(

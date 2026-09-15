@@ -84,6 +84,8 @@ enum SettingsBackupCoverage {
             + "list commands that aren't there.",
         AppSettingsKey.palettePosition.rawValue:
             "Machine-local geometry: every entry names a display this Mac has, and no other one.",
+        AppSettingsKey.aiBarPosition.rawValue:
+            "Machine-local geometry: the AI bar's placement names a display this Mac has, no other.",
         AppSettingsKey.autoSwitchInputSource.rawValue:
             "Names a keyboard input source installed on this Mac; another Mac may not have it.",
         AppSettingsKey.calendarEnabled.rawValue:

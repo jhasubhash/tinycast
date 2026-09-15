@@ -4,6 +4,8 @@ import Foundation
 enum HotKeyAction: Hashable, Sendable {
     /// The one fixed action with no command row of its own.
     case togglePalette
+    /// The floating AI Chat bar; also fixed, and shares the launcher's chat and history.
+    case toggleAIBar
     /// Parameterised over the catalog, so a new built-in command is bindable with no case here.
     case command(CommandID)
     case app(bundleID: String)
@@ -23,6 +25,7 @@ enum HotKeyAction: Hashable, Sendable {
     var defaultsKey: String {
         switch self {
         case .togglePalette: "hotkey.togglePalette"
+        case .toggleAIBar: "hotkey.toggleAIBar"
         case .command(let id): "hotkey." + id.rawValue
         case .app(let bundleID): "hotkey.app." + bundleID
         case .settingsPane(let bundleID): "hotkey.pane." + bundleID
@@ -39,5 +42,5 @@ enum HotKeyAction: Hashable, Sendable {
 
     /// The fixed actions every install can bind; the per-item catalogs extend them at launch.
     static let builtInActions: [HotKeyAction] =
-        [.togglePalette] + CommandID.allCases.compactMap(\.hotKeyAction)
+        [.togglePalette, .toggleAIBar] + CommandID.allCases.compactMap(\.hotKeyAction)
 }

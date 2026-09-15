@@ -11,6 +11,9 @@ final class AIChatState {
     private(set) var notice: String?
     /// Files staged for the next message; they go out with whatever is typed next.
     private(set) var pendingAttachments: [ChatAttachment] = []
+    /// Set when the user deliberately starts a new chat, so closing and reopening keeps the empty
+    /// session rather than resurrecting the last saved one. Cleared the moment it holds a message.
+    private(set) var startedFresh = false
 
     /// Every path that consumes or drops the staged images moves this on, so a late decode knows
     @ObservationIgnored private(set) var stagingGeneration = 0
@@ -37,6 +40,7 @@ final class AIChatState {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || !pendingAttachments.isEmpty, !isStreaming else { return false }
         notice = nil
+        startedFresh = false
         session.append(
             ChatMessage(
                 role: .user, text: text, images: pendingAttachments.compactMap(\.image),
@@ -125,12 +129,13 @@ final class AIChatState {
         finishLast(state: .failed, fallback: "Cancelled")
     }
 
-    func startNewChat() {
+    func startNewChat(userInitiated: Bool = false) {
         cancel()
         session = ChatSession()
         usage = nil
         notice = nil
         clearStaging()
+        startedFresh = userInitiated
     }
 
     /// Staged images belong to the conversation they were picked in; leaving it drops them.
@@ -143,6 +148,7 @@ final class AIChatState {
         usage = nil
         notice = nil
         clearStaging()
+        startedFresh = false
         return true
     }
 

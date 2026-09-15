@@ -250,6 +250,23 @@ final class AppSettings {
         palettePositions[display] = [offset.x, offset.y]
     }
 
+    /// The AI bar's own placement, kept apart from the palette's so each summons where it was left.
+    var aiBarPositions: [String: [Double]] {
+        didSet { defaults.set(aiBarPositions, forKey: Key.aiBarPosition.rawValue) }
+    }
+
+    func aiBarPosition(on display: String) -> CGPoint? {
+        aiBarPositions[display].flatMap { $0.count == 2 ? CGPoint(x: $0[0], y: $0[1]) : nil }
+    }
+
+    func setAIBarPosition(_ offset: CGPoint?, on display: String) {
+        guard let offset else {
+            aiBarPositions.removeValue(forKey: display)
+            return
+        }
+        aiBarPositions[display] = [offset.x, offset.y]
+    }
+
     // Feature switches, off out of the box, and off means fully off.
     var fileSearchEnabled: Bool {
         didSet { defaults.set(fileSearchEnabled, forKey: Key.fileSearchEnabled.rawValue) }
@@ -561,6 +578,9 @@ final class AppSettings {
         paletteDraggable = defaults.bool(forKey: Key.paletteDraggable.rawValue)
         palettePositions =
             defaults.dictionary(forKey: Key.palettePosition.rawValue)
+            as? [String: [Double]] ?? [:]
+        aiBarPositions =
+            defaults.dictionary(forKey: Key.aiBarPosition.rawValue)
             as? [String: [Double]] ?? [:]
         fileSearchEnabled = defaults.bool(forKey: Key.fileSearchEnabled.rawValue)
         // Unset seeds home; a stored empty array is a cleared list that searches nothing.

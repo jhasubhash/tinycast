@@ -272,6 +272,7 @@ final class AppCore {
             snippetListener.healthTicker = healthTicker
 
             hotKeys.onTogglePalette = { [weak self] in self?.paletteCoordinator.togglePalette() }
+            hotKeys.onToggleAIBar = { [weak self] in self?.aiChatCoordinator.toggleBar() }
             hotKeys.onRunCommand = { [weak self] id in self?.launcherCoordinator.runCommand(id) }
             hotKeys.onRunCustomCommand = { [weak self] id in
                 self?.customCommandCoordinator.runCustomCommand(id: id)
@@ -397,7 +398,7 @@ final class AppCore {
             return appIndex.apps.first { $0.kind == .extensionCommand && $0.id == entryID }?.name
         case .pluginCommand(let entryID):
             return appIndex.apps.first { $0.kind == .plugin && $0.id == entryID }?.name
-        case .togglePalette, .command, .systemAction, .windowCommand:
+        case .togglePalette, .toggleAIBar, .command, .systemAction, .windowCommand:
             return nil
         }
     }

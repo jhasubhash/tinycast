@@ -42,6 +42,12 @@ final class PaletteState {
     private(set) var favoriteSlotIndex: Int?
     /// Set by the compact bar's overflow to expand without a query; cleared by `prepare`.
     var forceExpanded = false
+    /// This AI summon is the floating bar: its own placement, a collapsed composer, direction-aware.
+    var aiBar = false
+    /// The AI bar has grown past the composer to show the transcript; a new chat collapses it back.
+    var aiBarExpanded = false
+    /// The bar is placed low, so it grows upward and docks its composer at the bottom.
+    var aiBarGrowsUp = false
     /// The paste target, mirrored on every show; `prepare` resets the screen, not this.
     var pasteTarget: PasteTarget?
     /// Values typed into a row's inline argument fields, keyed by `argumentKey`.
@@ -151,6 +157,12 @@ final class PaletteState {
         fileSearchFilter = .all
         fileSearchQuickLook = false
         forceExpanded = false
+        // The bar flavor lives only within `.ai`; leaving it drops both the flag and its placement.
+        if mode != .ai {
+            aiBar = false
+            aiBarExpanded = false
+            aiBarGrowsUp = false
+        }
         dropHoverHighlight()
         menuOpen = false
         menuFilterQuery = ""
