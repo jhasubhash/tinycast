@@ -20,6 +20,13 @@ public struct PluginMetadata: Sendable, Equatable {
 
 // MARK: - Context
 
+/// How a surface is being shown: inside the palette, or as a standalone pop-out window. A plugin
+/// reads this in `rootSurface` to drop its own chrome when it stands alone.
+@frozen public enum PluginPresentation: Sendable, Equatable {
+    case palette
+    case window
+}
+
 /// Everything the host knows about the moment a plugin is asked for rows or runs an action.
 /// A plugin takes the world as a parameter — it never reaches for the frontmost app itself.
 public struct PluginContext: Sendable, Equatable {
@@ -32,15 +39,19 @@ public struct PluginContext: Sendable, Equatable {
     /// The saved deep link this launch is restoring, or nil for a normal open. A plugin reads it in
     /// `rootSurface` to open straight to a nested view.
     public var route: [String: String]?
+    /// Whether this surface is shown in the palette or as a standalone pop-out window. A plugin
+    /// reads it in `rootSurface` to render bare — no scaffold — when it stands on its own.
+    public var presentation: PluginPresentation
 
     public init(
         query: String = "", frontmostAppBundleID: String? = nil, finderSelection: [URL] = [],
-        route: [String: String]? = nil
+        route: [String: String]? = nil, presentation: PluginPresentation = .palette
     ) {
         self.query = query
         self.frontmostAppBundleID = frontmostAppBundleID
         self.finderSelection = finderSelection
         self.route = route
+        self.presentation = presentation
     }
 }
 
@@ -326,6 +337,7 @@ public struct PluginScaffold<Root: View>: View {
     @Environment(\.pluginToggleMainMenu) private var pluginToggleMainMenu
     @Environment(\.pluginMainMenuPinned) private var pluginMainMenuPinned
     @Environment(\.pluginCopyRouteLink) private var pluginCopyRouteLink
+    @Environment(\.pluginPopOut) private var pluginPopOut
     @State private var paletteOpen = false
     @State private var selection = 0
     @State private var paletteQuery = ""
@@ -453,6 +465,11 @@ public struct PluginScaffold<Root: View>: View {
                     title: "Copy Deep Link",
                     icon: .symbol("link"),
                     action: { pluginCopyRouteLink(route) }),
+                PluginCommand(
+                    id: "__tinycast_pop_out__",
+                    title: "Pop Out",
+                    icon: .symbol("macwindow.badge.plus"),
+                    action: { pluginPopOut(route) }),
             ]
         } ?? []
         // A plugin that placed a `mainMenuSlot()` gets these there; otherwise they land at the end.
@@ -973,6 +990,11 @@ public struct PluginCopyRouteLinkKey: EnvironmentKey {
     public static let defaultValue: @MainActor (PluginRoute) -> Void = { _ in }
 }
 
+/// How a scaffold pops the current view out into its own standalone window; the host owns the panel.
+public struct PluginPopOutKey: EnvironmentKey {
+    public static let defaultValue: @MainActor (PluginRoute) -> Void = { _ in }
+}
+
 public extension EnvironmentValues {
     var pluginExit: @MainActor () -> Void {
         get { self[PluginExitKey.self] }
@@ -989,5 +1011,9 @@ public extension EnvironmentValues {
     var pluginCopyRouteLink: @MainActor (PluginRoute) -> Void {
         get { self[PluginCopyRouteLinkKey.self] }
         set { self[PluginCopyRouteLinkKey.self] = newValue }
+    }
+    var pluginPopOut: @MainActor (PluginRoute) -> Void {
+        get { self[PluginPopOutKey.self] }
+        set { self[PluginPopOutKey.self] = newValue }
     }
 }

@@ -197,6 +197,32 @@ The one case a restart is still required: **updating a plugin that is already lo
 plugin has been launched this session its dylib is mapped, and `dlopen` reference-counts — rebuilding
 the same path won't replace the running image. Quit and reopen Tinycast to pick up a rebuilt dylib.
 
+## Pop-out windows
+
+A plugin surface can be **popped out into its own standalone window** — the ⌘K palette's **Pop Out**
+command, beside Add to Main Menu. The window renders only the plugin's own view — no palette header,
+footer or scaffold — over the same backdrop the launcher draws. It is borderless, resizable, moved by
+dragging its background and closed with ⌘W; a bottom-right ⌘K palette carries its window controls
+(show on all spaces, keep in front, close).
+
+Each pop-out loads its **own** plugin instance, independent of the palette's running session and of
+every other window, so several float at once — keyed by `PluginRoute`, so an ADBE chart and an MSFT
+chart are distinct windows.
+
+Opt a surface into a bare window body by reading `PluginContext.presentation`:
+
+```swift
+func rootSurface(context: PluginContext) -> AnyView? {
+    if context.presentation == .window {
+        return AnyView(MyChart(route: context.route))   // bare — no PluginScaffold
+    }
+    return AnyView(MySurface(…))                          // in-palette: wrap in PluginScaffold
+}
+```
+
+`.window` needs a `PluginRoute` (the scaffold's `route:` closure), which both identifies the window
+and restores its content; a surface with no route offers no Pop Out.
+
 ## Security
 
 A plugin is native code loaded into Tinycast's process: it inherits every permission Tinycast holds

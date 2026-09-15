@@ -267,8 +267,9 @@ struct RootPaletteView: View {
                             showActions: screen.hasActions(at: sel))
                     }
                 }
-                // The panel has no title bar, so this thin top margin is the only place left to grab it.
-                .overlay(alignment: .top) { if !pluginSurfaceActive { topDragStrip } }
+                // The panel has no title bar, so this thin top margin is the only place left to grab
+                // it — kept even over a plugin surface, so Drag to reposition still works there.
+                .overlay(alignment: .top) { topDragStrip }
                 .modifier(
                     ExtensionToastOverlay(extensions: extensions, showing: vm.mode == .extensionCommand)
                 )
@@ -415,6 +416,7 @@ struct RootPaletteView: View {
             .environment(\.pluginToggleMainMenu) { core.pluginCoordinator.toggleRoutePin($0) }
             .environment(\.pluginMainMenuPinned) { core.pluginCoordinator.isRoutePinned($0) }
             .environment(\.pluginCopyRouteLink) { core.pluginCoordinator.copyRouteLink($0) }
+            .environment(\.pluginPopOut) { core.pluginCoordinator.popOut($0) }
             .modifier(SearchFieldHiding(hidden: hidesSearchField, apply: applySearchFieldHiding))
             // Several paths flip `paletteIsCollapsed`, so resize the window to match.
             .onChange(of: core.paletteCoordinator.paletteIsCollapsed) {

@@ -102,6 +102,8 @@ final class AppCore {
     @ObservationIgnored private(set) lazy var pluginCoordinator = PluginCoordinator(
         plugins: plugins, palette: palette, paletteCoordinator: paletteCoordinator,
         settingsCoordinator: settingsCoordinator, settings: settings, core: self)
+    @ObservationIgnored private(set) lazy var pluginWindowController = PluginWindowController(
+        core: self)
     @ObservationIgnored private(set) lazy var windowCommandCoordinator = WindowCommandCoordinator(
         settings: settings, paletteCoordinator: paletteCoordinator, windowMover: windowMover,
         spaceSwitcher: spaceSwitcher)
