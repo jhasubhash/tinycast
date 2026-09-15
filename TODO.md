@@ -171,3 +171,31 @@ Codex assistant, so it must stay sandboxed.
 
 **Risk:** a second, deliberately un-sandboxed `codex` process runs arbitrary shell with the user's
 login while such an assistant is active. Same accepted-risk posture as Claude's shell opt-in.
+
+---
+
+# TODO — Palette closes to the wrong Space (empty-Space summon)
+
+Summoning the palette on a Space that has **no focused window** (a fresh/empty desktop Space), then
+closing it, snaps the desktop back to the Space where a window was last selected.
+
+**Repro:** switch to an empty Space → summon the palette → dismiss it → macOS returns to the previous
+Space.
+
+**Diagnosed cause (partial):** the palette is a `.nonactivatingPanel`, so summoning never changes the
+frontmost app. On an empty Space `NSWorkspace.shared.frontmostApplication` is still the app whose
+window lives on the *previous* Space, and `PaletteWindowController.hide(restoreFocus:)` calls
+`previousApp?.activate()`, which raises that app's window on its own Space — the jump.
+
+**Tried, did NOT fix:** guarding the `activate()` to fire "only if `previousApp` is no longer
+frontmost". The Space still changed on hide — so either `previousApp` isn't frontmost at hide time
+(guard passes, `activate()` still fires) or something other than `activate()` drives the switch
+(`orderOut` of a `.canJoinAllSpaces` panel, focus hand-back). Reverted; needs live multi-Space
+instrumentation to pin down which app is frontmost at hide and whether `orderOut` alone switches.
+
+**Note:** other launchers (Raycast/Alfred-class) show the same behaviour — likely a macOS
+window-server quirk, not obviously a Tinycast-only bug. Low priority.
+
+**Verification when fixed (driven, multi-Space):** empty Space → summon + dismiss stays put; Space
+with a focused window → dismiss still returns focus to that window; secondary-monitor +
+`openOnCursorScreen` placement unaffected.
