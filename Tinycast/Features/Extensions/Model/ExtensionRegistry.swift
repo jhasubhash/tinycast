@@ -62,8 +62,8 @@ struct ExtensionRegistry: Codable, Identifiable, Hashable, Sendable {
     /// A pasted GitHub URL: the repository root, or the `/tree/<ref>/<path>` a browser copies.
     static func parse(_ text: String, name: String? = nil) -> ExtensionRegistry? {
         var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        for prefix in ["https://", "http://", "github.com/", "www.github.com/"] {
-            if trimmed.hasPrefix(prefix) { trimmed = String(trimmed.dropFirst(prefix.count)) }
+        for prefix in ["https://", "http://", "github.com/", "www.github.com/"] where trimmed.hasPrefix(prefix) {
+            trimmed = String(trimmed.dropFirst(prefix.count))
         }
         if trimmed.hasPrefix("github.com/") { trimmed = String(trimmed.dropFirst(11)) }
         if trimmed.hasSuffix(".git") { trimmed = String(trimmed.dropLast(4)) }

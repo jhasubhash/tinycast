@@ -180,7 +180,7 @@ enum AXWindowAccess {
         else { return nil }
         // Type checked by CFGetTypeID above; `as?` on a CF type is a compile error.
 
-        let axValue = value as! AXValue
+        let axValue = unsafeDowncast(value, to: AXValue.self)
         return AXValueGetType(axValue) == type ? axValue : nil
     }
 
@@ -192,7 +192,7 @@ enum AXWindowAccess {
         else { return nil }
         // Type checked by CFGetTypeID above; `as?` on a CF type is a compile error.
 
-        return (value as! AXUIElement)
+        return unsafeDowncast(value, to: AXUIElement.self)
     }
 
     static func string(_ element: AXUIElement, _ attribute: String) -> String? {

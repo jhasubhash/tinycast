@@ -540,7 +540,7 @@ struct QuicklinkTests {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         task.waitUntilExit()
         if task.terminationStatus != 0 { fail("sqlite3 failed: \(sql.prefix(60))") }
-        return Set(String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init))
+        return Set((String(bytes: data, encoding: .utf8) ?? "").split(separator: "\n").map(String.init))
     }
 
     static func expect(_ condition: Bool, _ label: String) {

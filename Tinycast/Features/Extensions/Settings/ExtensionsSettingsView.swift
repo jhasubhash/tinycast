@@ -413,8 +413,7 @@ private struct ExtensionDisclosure: View {
 
                 rule
                 heading(installed.manifest.commands.count == 1 ? "Command" : "Commands")
-                ForEach(Array(installed.manifest.commands.enumerated()), id: \.element.id) {
-                    index, command in
+                ForEach(Array(installed.manifest.commands.enumerated()), id: \.element.id) { index, command in
                     if index > 0 { rule }
                     CommandRows(installed: installed, command: command)
                 }

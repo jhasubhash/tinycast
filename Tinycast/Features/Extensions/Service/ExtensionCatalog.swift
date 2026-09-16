@@ -180,7 +180,8 @@ enum ExtensionCatalog {
                     "\(url.lastPathComponent) doesn't contain a Raycast extension (no package.json with commands)."
             case .noBuiltCommands(let name):
                 return
-                    "\(name) has no built command bundles. Tinycast installs prebuilt extensions — run `ray build` in the extension folder first, or import one from an installed Raycast."
+                    "\(name) has no built command bundles. Tinycast installs prebuilt extensions — run `ray build` "
+                    + "in the extension folder first, or import one from an installed Raycast."
             case .wrongPlatform(let name):
                 return "\(name) doesn't support macOS."
             case .copyFailed(let reason):

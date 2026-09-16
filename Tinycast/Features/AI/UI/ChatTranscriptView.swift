@@ -330,8 +330,7 @@ struct ChatImageThumbnail: View {
         Group {
             if let decoded {
                 Image(nsImage: decoded)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .resizable().scaledToFill()
             } else {
                 Color.clear
             }

@@ -310,7 +310,7 @@ enum ShellCommandRunner {
             guard let data = try? handle.readToEnd(), !data.isEmpty else { return nil }
             // A byte-offset tail can open mid-scalar; dropping the orphans avoids a leading U+FFFD.
             let body = start > 0 ? data.drop { $0 & 0xC0 == 0x80 } : data[...]
-            return String(decoding: body, as: UTF8.self)
+            return (String(bytes: body, encoding: .utf8) ?? "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .nilIfEmpty
         }
@@ -329,7 +329,7 @@ enum ShellCommandRunner {
             }
             guard descriptor >= 0 else { return nil }
             let path = String(
-                decoding: bytes.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+                bytes: bytes.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, encoding: .utf8) ?? ""
             return StreamCapture(
                 url: URL(fileURLWithPath: path),
                 handle: FileHandle(fileDescriptor: descriptor, closeOnDealloc: true))

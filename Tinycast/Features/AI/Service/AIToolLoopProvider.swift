@@ -98,8 +98,8 @@ struct AIToolLoopProvider: AIProvider {
         let utf8 = result.content.utf8
         spent += min(utf8.count, allowance)
         guard utf8.count > allowance else { return result }
-        // A cut can land mid-scalar; `String(decoding:)` turns the remainder into a replacement.
-        let content = String(decoding: Array(utf8.prefix(allowance)), as: UTF8.self)
+        // A cut can land mid-scalar; a failed UTF-8 decode falls back to an empty string.
+        let content = String(bytes: Array(utf8.prefix(allowance)), encoding: .utf8) ?? ""
         return AIToolResult(
             callID: result.callID, content: content + "\n…truncated.", isError: result.isError)
     }

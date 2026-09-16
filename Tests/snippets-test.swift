@@ -89,7 +89,8 @@ struct SnippetsTests {
         check(
             "serializer emits canonical key order",
             serialized.hasPrefix(
-                "---\nname: \"Quote \\\" slash \\\\ line\\nreturn\\rtab\\t雪\"\nkeyword: \"!\\\"\\\\\\n\\t\"\nenabled: false\nshow_confirmation: true\n---\n"
+                "---\nname: \"Quote \\\" slash \\\\ line\\nreturn\\rtab\\t雪\"\nkeyword: \"!\\\"\\\\\\n\\t\"\n"
+                    + "enabled: false\nshow_confirmation: true\n---\n"
             ))
         check(
             "Markdown codec preserves leading, blank, CRLF, and trailing body boundaries",
@@ -1060,7 +1061,8 @@ struct SnippetsTests {
             Snippet(
                 name: "Values",
                 text:
-                    "C:{clipboard}|S:{selection}|D:{date format=\"yyyy-MM-dd HH:mm\"}|{argument name=\"First\"}|{argument}|{argument name=\"First\"}"
+                    "C:{clipboard}|S:{selection}|D:{date format=\"yyyy-MM-dd HH:mm\"}"
+                        + "|{argument name=\"First\"}|{argument}|{argument name=\"First\"}"
             ))
         let missing = SnippetTemplateEngine.expand(values, snippets: [values], context: context)
         check(

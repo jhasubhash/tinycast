@@ -5,7 +5,7 @@ enum AIModelDiscovery {
         let id: String
         let name: String
         /// `nil` when the catalog doesn't say; OpenRouter lists `text`, `image`, `file`, `audio`.
-        var inputModalities: [String]? = nil
+        var inputModalities: [String]?
         var reasoningOptions: AIConnection.ReasoningOptions?
 
         init(

@@ -211,7 +211,7 @@ struct ExtensionInstaller: Sendable {
                 continuation.resume(
                     returning: CommandResult(
                         status: finished.terminationStatus,
-                        output: String(decoding: data, as: UTF8.self)))
+                        output: String(bytes: data, encoding: .utf8) ?? ""))
             }
             do {
                 try process.run()

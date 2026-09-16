@@ -133,7 +133,7 @@ struct AssistantStoreTests {
             Assistant(name: "First", order: 0),
             Assistant(name: "Second", order: 1)
         ]
-        defaults.set(try! JSONEncoder().encode(unordered), forKey: AppSettingsKey.aiAssistants.rawValue)
+        defaults.set(encoded(unordered), forKey: AppSettingsKey.aiAssistants.rawValue)
         let store = AssistantStore(defaults: defaults)
         expect(
             store.assistants.map(\.name) == ["First", "Second", "Third"],
@@ -147,8 +147,7 @@ struct AssistantStoreTests {
         let on1 = Skill(name: "On1", enabledInLibrary: true)
         let off = Skill(name: "Off", enabledInLibrary: false)
         let on2 = Skill(name: "On2", enabledInLibrary: true)
-        defaults.set(
-            try! JSONEncoder().encode([on1, off, on2]), forKey: AppSettingsKey.aiSkills.rawValue)
+        defaults.set(encoded([on1, off, on2]), forKey: AppSettingsKey.aiSkills.rawValue)
         let store = SkillStore(defaults: defaults, directory: tempDir())
 
         expect(
@@ -165,7 +164,7 @@ struct AssistantStoreTests {
     static func setEnabledTogglesAndPersists() {
         let defaults = freshDefaults()
         let skill = Skill(name: "Toggle", enabledInLibrary: true)
-        defaults.set(try! JSONEncoder().encode([skill]), forKey: AppSettingsKey.aiSkills.rawValue)
+        defaults.set(encoded([skill]), forKey: AppSettingsKey.aiSkills.rawValue)
         let store = SkillStore(defaults: defaults, directory: tempDir())
         store.setEnabled(false, for: skill.id)
         expect(store.skill(id: skill.id)?.enabledInLibrary == false, "setEnabled flips the switch")
@@ -226,7 +225,7 @@ struct AssistantStoreTests {
         let store = SkillStore(defaults: freshDefaults(), directory: tempDir())
         let first = tempDir()
         writeSkillMd(first, name: "Same", description: "v1", body: "old")
-        let original = try! store.importSkill(from: first)
+        let original = requireImport(store, from: first)
         store.setEnabled(false, for: original.id)
 
         let second = tempDir()
@@ -248,8 +247,8 @@ struct AssistantStoreTests {
         let b = tempDir()
         writeSkillMd(b, name: "my skill", description: "d", body: "b")
 
-        let first = try! store.importSkill(from: a)
-        let second = try! store.importSkill(from: b)
+        let first = requireImport(store, from: a)
+        let second = requireImport(store, from: b)
         expect(
             first.sourcePath != second.sourcePath,
             "two skills whose names slug alike land in distinct folders")
@@ -263,7 +262,7 @@ struct AssistantStoreTests {
         let store = SkillStore(defaults: freshDefaults(), directory: tempDir())
         let source = tempDir()
         writeSkillMd(source, name: "Gone", description: "d", body: "b")
-        let skill = try! store.importSkill(from: source)
+        let skill = requireImport(store, from: source)
         let path = skill.sourcePath
         store.remove(id: skill.id)
         expect(store.skills.isEmpty, "remove drops the entry")
@@ -273,6 +272,18 @@ struct AssistantStoreTests {
     }
 
     // MARK: - Fixtures
+
+    static func encoded<T: Encodable>(_ value: T) -> Data {
+        (try? JSONEncoder().encode(value)) ?? Data()
+    }
+
+    static func requireImport(_ store: SkillStore, from url: URL) -> Skill {
+        do {
+            return try store.importSkill(from: url)
+        } catch {
+            fatalError("expected importSkill to succeed: \(error)")
+        }
+    }
 
     static func writeSkillMd(_ folder: URL, name: String, description: String, body: String) {
         let contents = "---\nname: \(name)\ndescription: \(description)\n---\n\(body)\n"

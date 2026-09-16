@@ -56,8 +56,8 @@ enum ExecutableLocator {
             process.executableURL = URL(fileURLWithPath: "/bin/zsh")
             process.arguments = ["-ilc", "command -v \(command)"]
             process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-            process.environment = ProcessInfo.processInfo.environment.merging(["TINYCAST": "1"]) {
-                _, new in new
+            process.environment = ProcessInfo.processInfo.environment.merging(["TINYCAST": "1"]) { _, new in
+                new
             }
             process.standardInput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
@@ -72,7 +72,7 @@ enum ExecutableLocator {
             process.waitUntilExit()
             watchdog.cancel()
             guard process.terminationStatus == 0 else { return nil }
-            let path = String(decoding: data, as: UTF8.self)
+            let path = (String(bytes: data, encoding: .utf8) ?? "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return path.hasPrefix("/") ? path : nil
         }.value

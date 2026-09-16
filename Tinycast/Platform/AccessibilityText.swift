@@ -29,7 +29,7 @@ enum AccessibilityText {
             CFGetTypeID(focusedValue) == AXUIElementGetTypeID()
         else { return nil }
 
-        let element = focusedValue as! AXUIElement
+        let element = unsafeDowncast(focusedValue, to: AXUIElement.self)
         AXUIElementSetMessagingTimeout(element, timeout)
         return element
     }

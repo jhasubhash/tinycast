@@ -120,8 +120,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
 
     /// A local monitor sees the key before menu dispatch; returning nil swallows it.
     private func installPasteMonitor() {
-        pasteMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
-            [weak self] event in
+        pasteMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, self.panel?.isKeyWindow == true,
                 Self.commandCharacter(from: event) == "v"
             else { return event }
@@ -175,8 +174,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             popToRoot()
             return
         }
-        popToRootTimer = Timer.scheduledTimer(withTimeInterval: timeout.interval, repeats: false) {
-            [weak self] _ in
+        popToRootTimer = Timer.scheduledTimer(withTimeInterval: timeout.interval, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, !self.core.extensions.isAuthorizing else { return }
                 self.popToRootTimer = nil

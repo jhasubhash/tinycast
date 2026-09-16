@@ -191,7 +191,7 @@ final class MCPStdioTransport: MCPTransport {
 
     private func didExit(status: Int32) {
         drainStderr()
-        let detail = String(decoding: stderrBuffer, as: UTF8.self)
+        let detail = (String(bytes: stderrBuffer, encoding: .utf8) ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let message = detail.isEmpty ? "The server exited with status \(status)." : detail
         // Pending calls are failed before the owner hears, or closing would overwrite the reason.

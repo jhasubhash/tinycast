@@ -817,7 +817,7 @@ final class TextInjector {
             CFGetTypeID(value) == AXValueGetTypeID()
         else { return nil }
 
-        let axValue = value as! AXValue
+        let axValue = unsafeDowncast(value, to: AXValue.self)
         guard AXValueGetType(axValue) == .cfRange else { return nil }
         var range = CFRange()
         guard AXValueGetValue(axValue, .cfRange, &range) else { return nil }

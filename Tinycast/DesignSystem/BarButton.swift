@@ -78,8 +78,7 @@ struct HeaderMenuButton: View {
                         .symbolRenderingMode(.hierarchical)
                 case .asset(let name):
                     Image(name)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
+                        .resizable().scaledToFit()
                         .frame(width: metrics.size.barBrandIcon, height: metrics.size.barBrandIcon)
                 case .file(let path):
                     MenuFileIcon(path: path)

@@ -105,8 +105,7 @@ struct ClipboardScreen: PaletteScreen {
     func body(selection: Int, scroll: ScrollIntent) -> AnyView {
         AnyView(
             content(selection: selection, scroll: scroll)
-                .onChange(of: ClipFollowKey(id: store.items.first?.id, token: vm.followToken)) {
-                    old, new in
+                .onChange(of: ClipFollowKey(id: store.items.first?.id, token: vm.followToken)) { old, new in
                     follow(from: old, to: new)
                 }
         )

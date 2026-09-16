@@ -392,7 +392,7 @@ private struct ExtensionMarkdownImage: View {
                     if image.isAnimated {
                         AnimatedImageView(image: image)
                     } else {
-                        Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
+                        Image(nsImage: image).resizable().scaledToFit()
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: 220)

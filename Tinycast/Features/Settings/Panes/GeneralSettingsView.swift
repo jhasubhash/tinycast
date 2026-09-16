@@ -52,7 +52,8 @@ struct GeneralSettingsView: View {
                 SettingsSectionHeader(.generalSearch)
             } footer: {
                 Text(
-                    "Tinycast privately learns which results you choose for each query. Reset all learned choices to restore the default order."
+                    "Tinycast privately learns which results you choose for each query. "
+                        + "Reset all learned choices to restore the default order."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

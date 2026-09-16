@@ -33,7 +33,7 @@ final class ExtensionNodeShims: @unchecked Sendable {
 
     private func envelope(_ payload: [String: Any]) -> String {
         (try? JSONSerialization.data(withJSONObject: payload)).map {
-            String(decoding: $0, as: UTF8.self)
+            String(bytes: $0, encoding: .utf8) ?? ""
         } ?? #"{"ok":false,"error":"could not encode host result","code":"EUNKNOWN"}"#
     }
 

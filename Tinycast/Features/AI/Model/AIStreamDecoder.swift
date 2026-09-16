@@ -31,7 +31,7 @@ struct SSEParser: Sendable {
     }
 
     private static func payload(in frame: some DataProtocol) -> String? {
-        let text = String(decoding: frame, as: UTF8.self)
+        let text = (String(bytes: frame, encoding: .utf8) ?? "")
             .replacingOccurrences(of: "\r\n", with: "\n")
         var dataLines: [String] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {

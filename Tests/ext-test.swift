@@ -585,7 +585,8 @@ struct ExtensionTests {
             tree: tree(
                 """
                 {"id":2,"type":"List","props":{"actions":{"id":8,"type":"ActionPanel","props":{},"children":[]}},"children":[
-                  {"id":3,"type":"List.Item","props":{"title":"A","actions":{"id":9,"type":"ActionPanel","props":{},"children":[]}},"children":[]},
+                  {"id":3,"type":"List.Item","props":{"title":"A","actions":{"id":9,"type":"ActionPanel",
+                    "props":{},"children":[]}},"children":[]},
                   {"id":4,"type":"List.Item","props":{"title":"B"},"children":[]}]}
                 """), query: "")
         check("item panel wins", panels.actionPanel(forItemAt: 0)?.id == 9)

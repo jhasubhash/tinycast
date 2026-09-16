@@ -990,6 +990,6 @@ final class ClipboardStore {
     nonisolated private static func columnString(_ stmt: OpaquePointer?, _ index: Int32) -> String? {
         guard let ptr = sqlite3_column_text(stmt, index) else { return nil }
         let count = Int(sqlite3_column_bytes(stmt, index))
-        return String(decoding: UnsafeBufferPointer(start: ptr, count: count), as: UTF8.self)
+        return String(bytes: UnsafeBufferPointer(start: ptr, count: count), encoding: .utf8) ?? ""
     }
 }

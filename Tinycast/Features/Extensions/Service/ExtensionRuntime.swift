@@ -192,17 +192,14 @@ final class ExtensionRuntime: @unchecked Sendable {
         let fieldCommand: @convention(block) (String, String) -> Void = { _, _ in
             // Field focus requests have no native target yet; the palette focuses the first field.
         }
-        let invoke: @convention(block) (String, String, String, String) -> Void = {
-            [weak self] callId, api, method, argsJSON in
+        let invoke: @convention(block) (String, String, String, String) -> Void = { [weak self] callId, api, method, argsJSON in
             self?.invokeAsync(callId: callId, api: api, method: method, argsJSON: argsJSON)
         }
-        let invokeSync: @convention(block) (String, String, String) -> String = {
-            [weak self] api, method, argsJSON in
+        let invokeSync: @convention(block) (String, String, String) -> String = { [weak self] api, method, argsJSON in
             guard let self else { return #"{"ok":false,"error":"runtime gone"}"# }
             return self.nodeShims.perform(api: api, method: method, argsJSON: argsJSON)
         }
-        let startTimer: @convention(block) (String, Double, Bool) -> Void = {
-            [weak self] id, milliseconds, repeats in
+        let startTimer: @convention(block) (String, Double, Bool) -> Void = { [weak self] id, milliseconds, repeats in
             self?.startTimer(id: id, milliseconds: milliseconds, repeats: repeats)
         }
         let clearTimer: @convention(block) (String) -> Void = { [weak self] id in
@@ -331,6 +328,6 @@ final class ExtensionRuntime: @unchecked Sendable {
             let data = try? JSONSerialization.data(
                 withJSONObject: value, options: [.fragmentsAllowed])
         else { return "" }
-        return String(decoding: data, as: UTF8.self)
+        return String(bytes: data, encoding: .utf8) ?? ""
     }
 }
