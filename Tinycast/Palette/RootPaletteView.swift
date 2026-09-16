@@ -40,6 +40,8 @@ struct RootPaletteView: View {
     @State private var menuPanel = MenuPanelController()
     /// The palette's own window, reported by `WindowReader`; the menu hangs off its frame.
     @State private var hostWindow: NSWindow?
+    /// The AI composer's rendered width, so its wrapped height is measured against the real column.
+    @State private var aiFieldWidth: CGFloat = 0
     /// The pending scroll request; modes are exclusive, so one piece of state serves all.
     @State private var scroll = ScrollIntent(kind: .top)
     /// Compact vs. full; the source of truth is on `AppCore`, so the two can't disagree.
@@ -355,8 +357,8 @@ struct RootPaletteView: View {
                 if !vm.isVisible, menuOpen { closeMenus() }
             }
             .onChange(of: vm.query) {
-                // The field is one line, so pasted line breaks collapse to spaces.
-                if vm.collapseQueryLineBreaks() { return }
+                // AI keeps its line breaks and re-measures its composer; every other mode is one line.
+                if vm.mode == .ai { updateAIComposer() } else if vm.collapseQueryLineBreaks() { return }
                 vm.selection = 0
                 scroll = ScrollIntent(kind: .top)
                 if vm.mode == .fileSearch { fileSearch.search(vm.query, filter: vm.fileSearchFilter) }
@@ -530,6 +532,11 @@ struct RootPaletteView: View {
                     return .handled
                 }
                 if isExtensionForm { return handleFormReturn(press) }
+                // ⇧↵ drops a line break into the AI composer; every other Return sends or submits.
+                if vm.mode == .ai, press.modifiers.contains(.shift), !command, !option {
+                    (hostWindow as? PalettePanel)?.insertIntoField("\n")
+                    return .handled
+                }
                 let screen = screen
                 guard command || option else {
                     guard !vm.isComposing else { return .ignored }
@@ -682,8 +689,13 @@ struct RootPaletteView: View {
         if hidden { vm.query = "" }
     }
 
+    /// A one-line composer centres in the bar; a wrapped one tops out so it grows downward.
+    private var headerVerticalAlignment: VerticalAlignment {
+        vm.mode == .ai && vm.aiComposerExtraHeight > 0 ? .top : .center
+    }
+
     private var header: some View {
-        HStack(alignment: .center, spacing: 0) {
+        HStack(alignment: headerVerticalAlignment, spacing: 0) {
             // Matches the list rows and section headers' own indent below.
             headerGutter(width: metrics.spacing.md * 2)
             // Every sub-screen leaves the same way, so the slot reads the same on all of them.
@@ -786,7 +798,7 @@ struct RootPaletteView: View {
             headerGutter(width: metrics.spacing.md * 2)
         }
         // Identical metrics in both states, so typing can't move the search bar.
-        .frame(height: metrics.size.headerHeight)
+        .frame(height: metrics.size.headerHeight + (vm.mode == .ai ? vm.aiComposerExtraHeight : 0))
         .padding(composeAtBottom ? .bottom : .top, metrics.size.headerPadding)
         .frame(maxWidth: .infinity)
         // Set after the show, so the field it names is focused rather than the search field.
@@ -830,9 +842,12 @@ struct RootPaletteView: View {
     /// True when the screen took the keyboard over, which leaves the header empty beside the chevron.
     private var hidesSearchField: Bool { !isCollapsed && screen.hidesSearchField }
 
-    /// The field, kept mounted and hidden rather than swapped: a branch would tear its editor down.
+    /// Launcher and AI need different field axes, so the field is chosen here, not mounted once; a
+    /// mode flip re-focuses through `onChange(of: vm.mode)`. A branch on query would tear it down.
     private var headerField: some View {
-        searchField
+        Group {
+            if vm.mode == .ai { aiComposerField } else { searchField }
+        }
             .frame(width: searchFieldWidth)
             .opacity(hidesSearchField ? 0 : 1)
             .allowsHitTesting(!hidesSearchField)
@@ -893,11 +908,8 @@ struct RootPaletteView: View {
             .font(metrics.typography.searchField)
             .tint(Theme.Colors.textPrimary)
             .focused($searchFocused)
-            // The AI bar fills the column so its model chip sits at the trailing edge; every mode
-            // stays one horizontally-scrolling line.
-            .frame(
-                maxWidth: vm.mode == .ai ? .infinity : nil, maxHeight: .infinity,
-                alignment: .leading)
+            // A single horizontally-scrolling line at a fixed size; the AI bar has its own composer.
+            .frame(maxWidth: nil, maxHeight: .infinity, alignment: .leading)
             .background(alignment: .leading) {
                 // An IME's marked text leaves `query` empty, so the placeholder would overlap it.
                 if vm.query.isEmpty, !vm.isComposing {
@@ -928,6 +940,91 @@ struct RootPaletteView: View {
                 // A hidden field takes no caret, so it claims no I-beam region either.
                 vm.searchFieldFrame = hidesSearchField ? .zero : $0
             }
+    }
+
+    /// The floating AI bar's own composer, kept apart from the launcher's single-line `searchField`.
+    /// A vertical axis wraps instead of scrolling sideways; the font shrinks once the text passes one
+    /// line and the bar grows to a cap, past which it scrolls. Plain ↵ sends, ⇧↵ breaks a line.
+    private var aiComposerField: some View {
+        @Bindable var vm = vm
+        return TextField("", text: $vm.query, axis: .vertical)
+            .textFieldStyle(.plain)
+            .lineLimit(1...Self.aiComposerMaxLines)
+            .font(.system(size: vm.aiComposerFontSize, weight: .regular))
+            .tint(Theme.Colors.textPrimary)
+            .focused($searchFocused)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // A vertical field distorts the caret under SwiftUI's native placeholder, so draw our own.
+            .background(alignment: .topLeading) {
+                if vm.query.isEmpty, !vm.isComposing {
+                    Text(searchPrompt)
+                        .font(.system(size: vm.aiComposerFontSize, weight: .regular))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .lineLimit(1)
+                        .allowsHitTesting(false)
+                }
+            }
+            .accessibilityLabel(Text(searchPrompt))
+            .overlay {
+                if settings.paletteDraggable {
+                    EmptyFieldDragHandle(
+                        isEmpty: vm.query.isEmpty && !vm.isComposing,
+                        onBegan: beginDrag, onEnded: endDrag,
+                        onClick: { searchFocused = true })
+                }
+            }
+            // The panel resolves the pointer against this frame; the composer measures its wrapped
+            // height against the width it actually got.
+            .onGeometryChange(for: CGRect.self) {
+                $0.frame(in: .global)
+            } action: { rect in
+                vm.searchFieldFrame = rect
+                if abs(aiFieldWidth - rect.width) > 0.5 {
+                    aiFieldWidth = rect.width
+                    updateAIComposer()
+                }
+            }
+    }
+
+    /// The composer grows to this many lines, then scrolls inside a fixed height.
+    private static let aiComposerMaxLines = 6
+    /// Smaller than the launcher's field; smaller still once the composer wraps.
+    private static let aiComposerFontLarge: CGFloat = 16
+    private static let aiComposerFontSmall: CGFloat = 14
+
+    /// Picks the composer font — one size, a smaller one once it wraps — and the height the bar grows
+    /// by, both measured from the query at the field's own width. Growth caps at the line threshold,
+    /// past which the field scrolls. Off `.ai` it resets so the launcher keeps its one-line field.
+    private func updateAIComposer() {
+        guard vm.mode == .ai else {
+            vm.aiComposerFontSize = Self.aiComposerFontLarge
+            if vm.aiComposerExtraHeight != 0 { vm.aiComposerExtraHeight = 0 }
+            return
+        }
+        let width = max(1, aiFieldWidth)
+        let oneLineLarge = Self.textHeight("Ag", width: width, size: Self.aiComposerFontLarge)
+        let large = Self.textHeight(vm.query, width: width, size: Self.aiComposerFontLarge)
+        let size = large > oneLineLarge + 1 ? Self.aiComposerFontSmall : Self.aiComposerFontLarge
+        let content =
+            size == Self.aiComposerFontLarge
+            ? large : Self.textHeight(vm.query, width: width, size: size)
+        let cap = Self.textHeight("Ag", width: width, size: size) * CGFloat(Self.aiComposerMaxLines)
+        let extra = max(0, min(cap, content) - metrics.size.headerHeight)
+        vm.aiComposerFontSize = size
+        if abs(vm.aiComposerExtraHeight - extra) > 0.5 {
+            vm.aiComposerExtraHeight = extra
+            core.paletteCoordinator.syncPaletteSize()
+        }
+    }
+
+    private static func textHeight(_ text: String, width: CGFloat, size: CGFloat) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: size, weight: .regular)
+        let string = text.isEmpty ? " " : text
+        let rect = (string as NSString).boundingRect(
+            with: CGSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font])
+        return ceil(rect.height)
     }
 
     /// The Uninstall screen's primary action is destructive, so its pill isn't white.

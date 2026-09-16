@@ -237,6 +237,16 @@ prompt framework writes stderr under `TERM=dumb`; the real message on stdout was
 **Fix.** `zsh -lc` with `TERM=xterm-256color`, show stdout *and* stderr, strip prompt chatter.
 **Check.** Run the command through the same shell it uses, read both streams.
 
+### ⇧↵ sent instead of breaking a line in the AI composer — 2026-09
+
+**Symptom.** In the floating AI bar, ⇧↵ sent the message like a bare ↵ instead of inserting a
+newline; the composer also shared the launcher's single-line field.
+**Cause.** The palette's container `onKeyPress(.return)` runs ahead of a focused `TextField`'s own
+`.onKeyPress`, so the field-level ⇧↵ handler never fired and Return fell through to the send guard.
+**Fix.** A dedicated `aiComposerField` (vertical axis, own font and growth), with ⇧↵ handled in the
+container — `PalettePanel.insertIntoField("\n")` — before that guard.
+**Check.** ⇧↵ in the AI bar adds a line; plain ↵ sends; the launcher field stays single-line.
+
 ## 8. Before you call a UI change done
 
 - Driver script ran end to end against a freshly restarted Debug build.
