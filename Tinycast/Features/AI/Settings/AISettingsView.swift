@@ -38,6 +38,8 @@ struct AISettingsView: View {
                 .settingsEnabled(appSettings.aiEnabled)
 
             Group {
+                AssistantsSettingsSection()
+                SkillsSettingsSection()
                 defaultModelSection
                 chatSection
                 conversationsSection
@@ -110,7 +112,7 @@ struct AISettingsView: View {
     private var providerSummary: String {
         var providers: [String] = []
         if subscription.isConnected { providers.append("Codex") }
-        for kind in [InstalledAIKind.claude, .openCode]
+        for kind in [InstalledAIKind.claude, .openCode, .copilot]
         where installedAI.status(for: kind).isReady {
             providers.append(kind.title)
         }
@@ -123,11 +125,28 @@ struct AISettingsView: View {
 
     private var chatSection: some View {
         @Bindable var settings = settings
+        @Bindable var appSettings = appSettings
         return Section {
+            SettingsRow(
+                title: "Floating bar",
+                subtitle: "A shortcut that summons AI Chat as a bar you can place anywhere — it "
+                    + "shares this chat and history.",
+                subtitleLineLimit: 2, anchor: .aiChat
+            ) {
+                ShortcutRecorder(action: .toggleAIBar)
+            }
+            Toggle(isOn: $appSettings.aiBarStaysOpen) {
+                SettingsRowTitle(.aiChat, "Keep the floating bar open")
+                Text("Stay open when you click into another app, instead of closing on focus loss.")
+            }
             Toggle(isOn: $settings.webSearchEnabled) {
                 SettingsRowTitle(.aiChat, "Web search")
                 Text(
                     "Sends prompts on to a search engine when the route offers one — Codex and OpenRouter.")
+            }
+            Toggle(isOn: $settings.showReasoning) {
+                SettingsRowTitle(.aiChat, "Stream reasoning")
+                Text("Shows the model's thinking as it streams, instead of a lone spinner.")
             }
         } header: {
             SettingsSectionHeader(.aiChat)
@@ -258,6 +277,7 @@ struct AISettingsView: View {
             }
             installedConnection(.claude)
             installedConnection(.openCode)
+            installedConnection(.copilot)
         } header: {
             SettingsSectionHeader(.aiInstalledAI)
         } footer: {
@@ -500,7 +520,7 @@ struct AISettingsView: View {
             codexModels: enabledProviders.contains(.codex) ? subscription.models : [],
             isUnavailable: !enabledProviders.contains(.codex) || subscription.phase == .signedOut
                 || subscription.phase.isUnavailable)
-        for kind in [InstalledAIKind.claude, .openCode] {
+        for kind in [InstalledAIKind.claude, .openCode, .copilot] {
             let status = installedAI.status(for: kind)
             settings.reconcile(
                 installed: kind,

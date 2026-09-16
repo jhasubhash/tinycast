@@ -50,6 +50,19 @@ final class PaletteState {
     private(set) var emojiGridZoom: EmojiGridZoom?
     /// Set by the compact bar's overflow to expand without a query; cleared by `prepare`.
     var forceExpanded = false
+    /// This AI summon is the floating bar: its own placement, a collapsed composer, direction-aware.
+    var aiBar = false
+    /// The AI bar has grown past the composer to show the transcript; a new chat collapses it back.
+    var aiBarExpanded = false
+    /// The bar is placed low, so it grows upward and docks its composer at the bottom.
+    var aiBarGrowsUp = false
+    /// The user-created Assistant this summon is scoped to; nil is the default bar. Cleared with the
+    /// bar flavor when the screen leaves `.ai`.
+    var activeAssistantID: UUID?
+    /// The AI composer's font size and its wrapped height beyond the header's one-line base — the
+    /// field reads the former, the bar and header grow by the latter, so all three stay in agreement.
+    var aiComposerFontSize: CGFloat = 16
+    var aiComposerExtraHeight: CGFloat = 0
     /// The paste target, mirrored on every show; `prepare` resets the screen, not this.
     var pasteTarget: PasteTarget?
     /// Values typed into a row's inline argument fields, keyed by `argumentKey`.
@@ -163,6 +176,15 @@ final class PaletteState {
         emojiGridColumnsOverride = nil
         fileSearchQuickLook = false
         forceExpanded = false
+        // The bar flavor lives only within `.ai`; leaving it drops both the flag and its placement.
+        if mode != .ai {
+            aiBar = false
+            aiBarExpanded = false
+            aiBarGrowsUp = false
+            aiComposerFontSize = 16
+            aiComposerExtraHeight = 0
+            activeAssistantID = nil
+        }
         dropHoverHighlight()
         menuOpen = false
         menuFilterQuery = ""

@@ -91,6 +91,19 @@ depends on neither, and Quick Actions carries its own route rather than borrowin
   racing over the same state, and a verdict that still holds after a relaunch. A reply still
   streaming is never reset out from under the reader — it was asked for — and the transcript is
   saved regardless, so the old conversation is one ⌘K → Chat History away.
+- **The floating bar is the same chat, summoned as a bar.** A dedicated `toggleAIBar` hotkey
+  (Settings → AI → Floating bar) opens `.ai` as a compact composer that shares the launcher's chat and
+  history — never a second window or a second conversation. It carries its own per-display placement
+  (`AppSettings.aiBarPosition`, backup-excluded like the palette's own), stays collapsed to the
+  composer until the first message, then expands into the transcript, animated. Placed low it grows
+  **upward** and docks the composer at the bottom with the transcript above
+  (`PaletteState.aiBarGrowsUp`, applied by `RootPaletteView.composeAtBottom`), a keycap `Actions ⌘K`
+  beside the model name and no Send pill; placed high or centred it grows down with the normal footer.
+  `AIChatCoordinator.toggleBar` is the whole entry point; `showChat` — the launcher command — stays the
+  full window. Its actions carry shortcuts: New Chat `⌘N`, Copy Last Response `⇧⌘C`, Chat History `⌘Y`,
+  AI Settings `⌘,`. The composer is multi-line where the launcher's field is not: it wraps, shrinks its
+  font once wrapped, grows the bar to a six-line cap then scrolls, takes ⇧↵ for a line break, and can be
+  dragged by its glyph — all measured off the one shared field, which every other mode keeps single-line.
 - **Arriving with a question skips the open policy entirely.** `ask(_:)` — ⇥ from the launcher, and
   the AI fallback row — always starts a new chat and submits the text, because a question asked
   outright is not a summon: resuming a transcript to append an unrelated line to it would be the one
@@ -106,6 +119,9 @@ depends on neither, and Quick Actions carries its own route rather than borrowin
   idle past `Start a new conversation after`; `A New Conversation` always starts fresh. There is no
   third setting for "immediately" because that *is* `A New Conversation` — two controls able to
   express one state would only ever disagree.
+  A chat the reader *deliberately* started — ⌘K → New Chat — is marked `startedFresh`, so closing and
+  reopening keeps that empty chat rather than resuming the last saved one over it; the first sent
+  message clears the mark.
 - **History is local and lazy.** Conversation summaries stay in memory while transcripts load from the
   system SQLite database only for the selected preview or opened chat. Empty chats are never saved.
 - **Retention is enforced only while AI is on.** `Keep conversations` prunes on the enable transition
@@ -123,6 +139,42 @@ depends on neither, and Quick Actions carries its own route rather than borrowin
   on-device model. Every transport funnels through `requestMessages(textBudget:)`, so no route can
   resend every image each turn or let history grow the payload as a chat goes on. The composer refuses a picture
   past the budget and says so, rather than letting send time drop it silently.
+
+## Assistants
+
+An **Assistant** is a named, dedicated AI chat bar with its own **shortcut, model, system prompt,
+Skills, MCP-server subset, web search, open policy, retention, per-display placement and width**. The
+model is `Assistant` (pure, `Codable`); `AssistantStore` persists the library as JSON in
+`UserDefaults`, and `SkillStore` holds imported Claude Agent Skills under
+`application-support/skills`. Both are backup-excluded, like every other AI key — an assistant bundles
+machine-local placement and references to this Mac's Skills and MCP servers, and a Skill is billed
+instruction content, so neither may arrive from another Mac's backup.
+
+- **The default bar is never an Assistant.** `PaletteState.activeAssistantID` names the one a summon is
+  scoped to, or `nil` for the default `toggleAIBar` bar and the full `AI Chat` window. With it nil,
+  every send path, the model, the prompt, the tools and the history query are byte-for-byte today's
+  behaviour — the regression firewall for the whole feature.
+- **An active Assistant re-points the stack, it does not fork it.** `AIChatCoordinator` reads
+  `activeAssistant` in four places: `effectiveProvider` (the assistant's `model`, else the global
+  default), `AIInstructions.compose` (its `systemPrompt` + enabled `Skills`), `MCPCoordinator.tools`
+  (scoped to its `mcpServerIDs`), and the open policy (`opensTo`/`newChatAfter`). Its glyph and tint
+  lead the bar and its `seedPrompt` is the placeholder.
+- **History is scoped by assistant.** `ChatHistoryStore` carries a `scope: UUID?` and stamps each
+  conversation's `assistant_id`; `load`/`save` filter on it, so each assistant has its own
+  conversations and the default bar's stay separate. An `ephemeral` assistant never writes to disk.
+  The column is added by a NULL-preserving `ALTER TABLE`, so a database that predates it migrates its
+  rows to the default scope.
+- **Each Assistant is also a launcher command.** `AppEntry.Kind.assistant` publishes an "Ask <Name>"
+  row through `AppIndex.setAssistants`, gated by the AI feature through `settingsOwner = .ai` (no
+  `VisibilityStore` category — it mirrors `customCommand`). `aiAssistantsShowInLauncher` toggles the
+  rows; launching one calls `openAssistant(id:)`, the same path its per-assistant hotkey
+  (`HotKeyAction.assistant(id:)`) takes.
+- **Skills inject instructions, never code.** `AIInstructions.compose(skills:)` appends each enabled
+  Skill's body within a per-turn byte budget (smaller on device); bundled scripts are never run. A
+  `SKILL.md` with no `---` frontmatter naming a `name` is rejected at import.
+
+Settings → AI hosts the **Assistants** list (add/edit/remove, with the editor sheet) and the **Skills**
+library (import/enable/remove); see [the Settings section](#settings-and-backup-boundary).
 
 ## Connections and routing
 

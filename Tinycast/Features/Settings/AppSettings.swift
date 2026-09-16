@@ -255,6 +255,28 @@ final class AppSettings {
         palettePositions[display] = [offset.x, offset.y]
     }
 
+    /// The AI bar's own placement, kept apart from the palette's so each summons where it was left.
+    var aiBarPositions: [String: [Double]] {
+        didSet { defaults.set(aiBarPositions, forKey: Key.aiBarPosition.rawValue) }
+    }
+
+    func aiBarPosition(on display: String) -> CGPoint? {
+        aiBarPositions[display].flatMap { $0.count == 2 ? CGPoint(x: $0[0], y: $0[1]) : nil }
+    }
+
+    func setAIBarPosition(_ offset: CGPoint?, on display: String) {
+        guard let offset else {
+            aiBarPositions.removeValue(forKey: display)
+            return
+        }
+        aiBarPositions[display] = [offset.x, offset.y]
+    }
+
+    /// Keep the floating AI Chat bar open when focus moves to another app, instead of hiding on blur.
+    var aiBarStaysOpen: Bool {
+        didSet { defaults.set(aiBarStaysOpen, forKey: Key.aiBarStaysOpen.rawValue) }
+    }
+
     // Feature switches, off out of the box, and off means fully off.
     var fileSearchEnabled: Bool {
         didSet { defaults.set(fileSearchEnabled, forKey: Key.fileSearchEnabled.rawValue) }
@@ -293,6 +315,14 @@ final class AppSettings {
         didSet {
             defaults.set(
                 customCommandsShowInLauncher, forKey: Key.customCommandsShowInLauncher.rawValue)
+        }
+    }
+
+    /// With AI on, controls only whether the assistants' "Ask <Name>" rows appear in the launcher.
+    var aiAssistantsShowInLauncher: Bool {
+        didSet {
+            defaults.set(
+                aiAssistantsShowInLauncher, forKey: Key.aiAssistantsShowInLauncher.rawValue)
         }
     }
 
@@ -575,6 +605,10 @@ final class AppSettings {
         palettePositions =
             defaults.dictionary(forKey: Key.palettePosition.rawValue)
             as? [String: [Double]] ?? [:]
+        aiBarPositions =
+            defaults.dictionary(forKey: Key.aiBarPosition.rawValue)
+            as? [String: [Double]] ?? [:]
+        aiBarStaysOpen = defaults.bool(forKey: Key.aiBarStaysOpen.rawValue)
         fileSearchEnabled = defaults.bool(forKey: Key.fileSearchEnabled.rawValue)
         // Unset seeds home; a stored empty array is a cleared list that searches nothing.
         fileSearchScopes =
@@ -590,6 +624,9 @@ final class AppSettings {
         customCommandsShowInLauncher =
             defaults.object(forKey: Key.customCommandsShowInLauncher.rawValue) == nil
             || defaults.bool(forKey: Key.customCommandsShowInLauncher.rawValue)
+        aiAssistantsShowInLauncher =
+            defaults.object(forKey: Key.aiAssistantsShowInLauncher.rawValue) == nil
+            || defaults.bool(forKey: Key.aiAssistantsShowInLauncher.rawValue)
         snippetsEnabled = defaults.bool(forKey: Key.snippetsEnabled.rawValue)
         quickActionsEnabled = defaults.bool(forKey: Key.quickActionsEnabled.rawValue)
         snippetsShowInLauncher =

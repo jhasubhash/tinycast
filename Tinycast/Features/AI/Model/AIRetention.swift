@@ -1,7 +1,7 @@
 import Foundation
 
 /// Days as the raw value, `forever` negative so the 0 an unset key reads matches no case at all.
-enum AIRetention: Int, CaseIterable, Identifiable, Sendable {
+enum AIRetention: Int, Codable, CaseIterable, Identifiable, Sendable {
     case week = 7
     case month = 30
     case threeMonths = 90

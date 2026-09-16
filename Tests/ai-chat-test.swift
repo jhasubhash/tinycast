@@ -27,6 +27,7 @@ struct AIChatTests {
         historyRoundTripsAndRepairsInterruptedReplies()
         savesRewriteOnlyTheStoredTail()
         crashRepairSurvivesTailSaves()
+        adoptedMidStreamSettlesAsInterrupted()
         markdownParsesStreamingFriendlyBlocks()
         markdownParsesTablesQuotesAndLists()
         markdownKeepsCommonMarkEdges()
@@ -414,7 +415,7 @@ struct AIChatTests {
         expect(
             session.requestMessages().first?.images == [picture],
             "attached images travel with the request")
-        expect(loaded?.messages.last?.state == .failed, "an interrupted stream is repaired")
+        expect(loaded?.messages.last?.state == .interrupted, "an interrupted stream reloads settled")
         expect(
             loaded?.messages.last?.text == "Partial",
             "an interrupted partial answer is preserved")
@@ -509,17 +510,37 @@ struct AIChatTests {
             expect(false, "a crashed chat reloads")
             return
         }
-        expect(repaired.messages.last?.state == .failed, "reload repairs a crashed stream")
+        expect(repaired.messages.last?.state == .interrupted, "reload settles a crashed stream")
         reopened.save(repaired)
 
         let verified = ChatHistoryStore(directory: directory).session(id: id)
         expect(
-            verified?.messages.last?.state == .failed,
-            "saving a repaired chat persists the repair")
+            verified?.messages.last?.state == .interrupted,
+            "saving a settled chat persists the interrupted state")
         expect(
             verified?.messages.last?.searches
                 == [ChatSearch(query: "news", isComplete: true, textOffset: 1)],
             "a repaired tail keeps its searches")
+    }
+
+    /// A pop-out adopts a snapshot, not the live task: a reply still streaming in it must settle,
+    /// or the transcript spins "Thinking…" forever with nothing left to finish it.
+    static func adoptedMidStreamSettlesAsInterrupted() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tinycast-ai-adopt-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        var session = ChatSession(id: UUID(), createdAt: Date(timeIntervalSince1970: 4_000))
+        session.append(ChatMessage(role: .user, text: "Ask"))
+        session.append(ChatMessage(role: .assistant, text: "", state: .streaming))
+
+        let chat = AIChatState(history: ChatHistoryStore(directory: directory))
+        chat.adopt(session)
+
+        expect(
+            chat.session.messages.last?.state == .interrupted,
+            "an adopted streaming reply settles as interrupted")
+        expect(chat.liveStatus == nil, "a settled reply drops the Thinking spinner")
     }
 
     static func retentionPrunesByAgeAndCascades() {

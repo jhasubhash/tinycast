@@ -8,14 +8,15 @@ enum AIProviderFactory {
         settings: AISettingsStore,
         subscription: ChatGPTSubscriptionManager,
         installedAI: InstalledAIManager,
-        keyStore: KeychainSecretStore = .aiAPIKeys
+        keyStore: KeychainSecretStore = .aiAPIKeys,
+        cliTools: AICLIToolConfig? = nil
     ) throws -> any AIProvider {
         guard let selection = settings.defaultModel else {
             throw AIProviderError.unavailable("Choose a default AI model in Settings.")
         }
         return try make(
             selection: selection, settings: settings, subscription: subscription,
-            installedAI: installedAI, keyStore: keyStore)
+            installedAI: installedAI, keyStore: keyStore, cliTools: cliTools)
     }
 
     /// `guardrails` reaches only the on-device model, the one route that filters locally.
@@ -25,7 +26,8 @@ enum AIProviderFactory {
         subscription: ChatGPTSubscriptionManager,
         installedAI: InstalledAIManager,
         keyStore: KeychainSecretStore = .aiAPIKeys,
-        guardrails: SystemLanguageModel.Guardrails = .default
+        guardrails: SystemLanguageModel.Guardrails = .default,
+        cliTools: AICLIToolConfig? = nil
     ) throws -> any AIProvider {
         switch selection {
         case .appleIntelligence:
@@ -38,17 +40,25 @@ enum AIProviderFactory {
                 throw AIProviderError.unavailable("Codex is disabled in AI Settings.")
             }
             return CodexInstalledProvider(
-                turns: subscription.turns, model: model, effort: effort)
+                turns: subscription.turns, model: model, effort: effort, toolConfig: cliTools)
         case .claude(let model, let effort):
             guard settings.enabledInstalledProviders.contains(.claude) else {
                 throw AIProviderError.unavailable("Claude is disabled in AI Settings.")
             }
-            return try installedAI.provider(kind: .claude, model: model, effort: effort)
+            return try installedAI.provider(
+                kind: .claude, model: model, effort: effort, cliTools: cliTools)
         case .openCode(let model, let effort):
             guard settings.enabledInstalledProviders.contains(.openCode) else {
                 throw AIProviderError.unavailable("OpenCode is disabled in AI Settings.")
             }
-            return try installedAI.provider(kind: .openCode, model: model, effort: effort)
+            return try installedAI.provider(
+                kind: .openCode, model: model, effort: effort, cliTools: cliTools)
+        case .copilot(let model, let effort):
+            guard settings.enabledInstalledProviders.contains(.copilot) else {
+                throw AIProviderError.unavailable("Copilot is disabled in AI Settings.")
+            }
+            return try installedAI.provider(
+                kind: .copilot, model: model, effort: effort, cliTools: cliTools)
         case .api(let connectionID, let model, let effort):
             guard let connection = settings.connection(id: connectionID) else {
                 throw AIProviderError.unavailable("Choose an API connection in Settings.")

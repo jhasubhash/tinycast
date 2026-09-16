@@ -5,11 +5,12 @@ struct InstalledCLIProvider: AIProvider {
 
     @MainActor
     init(
-        kind: InstalledAIKind, executable: URL?, model: String, effort: String?, workspace: URL
+        kind: InstalledAIKind, executable: URL?, model: String, effort: String?, workspace: URL,
+        toolConfig: AICLIToolConfig? = nil
     ) {
         runner = InstalledCLITurnRunner(
             kind: kind, executable: executable, model: model, effort: effort,
-            workspace: workspace)
+            workspace: workspace, toolConfig: toolConfig)
     }
 
     func stream(_ request: AIRequest) -> AIProviderStream {
@@ -47,14 +48,18 @@ private final class InstalledCLITurnRunner {
     private var openCodeSessionID: String?
     private var activeExecutable: URL?
 
+    private let toolConfig: AICLIToolConfig?
+
     init(
-        kind: InstalledAIKind, executable: URL?, model: String, effort: String?, workspace: URL
+        kind: InstalledAIKind, executable: URL?, model: String, effort: String?, workspace: URL,
+        toolConfig: AICLIToolConfig?
     ) {
         self.kind = kind
         configuredExecutable = executable
         self.model = model
         self.effort = effort
         self.workspace = workspace
+        self.toolConfig = toolConfig
     }
 
     nonisolated func stream(_ request: AIRequest) -> AIProviderStream {
@@ -160,6 +165,48 @@ private final class InstalledCLITurnRunner {
     private var arguments: [String] {
         switch kind {
         case .claude:
+            if let toolConfig, toolConfig.allowShell {
+                // Full native tools (shell, file, MCP) so a script-based Skill can run. No permission
+                // prompts, and the MCP servers ride along when the assistant also enabled some.
+                var result = [
+                    "-p",
+                    "--model", model,
+                    "--input-format", "text",
+                    "--output-format", "stream-json",
+                    "--verbose",
+                    "--include-partial-messages",
+                    "--no-session-persistence",
+                    "--disable-slash-commands",
+                    "--dangerously-skip-permissions",
+                    "--no-chrome",
+                    "--max-turns", String(toolConfig.maxTurns)
+                ]
+                if !toolConfig.servers.isEmpty {
+                    result += ["--strict-mcp-config", "--mcp-config", toolConfig.claudeMCPConfigJSON]
+                }
+                if let effort { result += ["--effort", effort] }
+                return result
+            }
+            if let toolConfig {
+                // MCP-only: an `--allowedTools` allowlist scopes it to those servers — no Bash or files.
+                var result = [
+                    "-p",
+                    "--model", model,
+                    "--input-format", "text",
+                    "--output-format", "stream-json",
+                    "--verbose",
+                    "--include-partial-messages",
+                    "--no-session-persistence",
+                    "--disable-slash-commands",
+                    "--strict-mcp-config",
+                    "--mcp-config", toolConfig.claudeMCPConfigJSON,
+                    "--allowedTools", toolConfig.allowedTools.joined(separator: " "),
+                    "--no-chrome",
+                    "--max-turns", String(toolConfig.maxTurns)
+                ]
+                if let effort { result += ["--effort", effort] }
+                return result
+            }
             var result = [
                 "-p",
                 "--model", model,
@@ -187,6 +234,29 @@ private final class InstalledCLITurnRunner {
             ]
             if let effort { result += ["--variant", effort] }
             return result
+        case .copilot:
+            // Prompt arrives on stdin. `--output-format json` is JSONL; without `--allow-all-tools`
+            // no tool auto-runs, so the plain route stays text-only.
+            var result = [
+                "--output-format", "json",
+                "--no-color",
+                "--no-auto-update",
+                "--no-custom-instructions",
+                "--log-level", "none",
+                "--no-ask-user",
+                "--disable-builtin-mcps",
+                "--model", model
+            ]
+            if let effort { result += ["--reasoning-effort", effort] }
+            if let toolConfig {
+                // Shell tools need file + URL access too (a Skill's script hits its own host); `--allow-all`
+                // is tools+paths+urls. MCP-only stays at tools, since the servers do their own I/O.
+                result += toolConfig.allowShell ? ["--allow-all"] : ["--allow-all-tools"]
+                if !toolConfig.servers.isEmpty {
+                    result += ["--additional-mcp-config", toolConfig.copilotMCPConfigJSON]
+                }
+            }
+            return result
         case .codex:
             return []
         }
@@ -208,8 +278,12 @@ private final class InstalledCLITurnRunner {
             result["OPENCODE_CONFIG_CONTENT"] = Self.openCodeConfiguration
             result["OPENCODE_AUTO_SHARE"] = "false"
             result["OPENCODE_DISABLE_AUTOUPDATE"] = "true"
-        case .codex:
+        case .codex, .copilot:
             break
+        }
+        // The assistant's own variables win, so a Skill's script can authenticate with its own tokens.
+        if let toolConfig {
+            for (key, value) in toolConfig.environment { result[key] = value }
         }
         return result
     }
@@ -221,7 +295,8 @@ private final class InstalledCLITurnRunner {
                     && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             })
         else { return nil }
-        var sections = [Self.safetyInstructions]
+        // The "do not invoke tools" instruction is dropped once tools are the point of the turn.
+        var sections = toolConfig == nil ? [Self.safetyInstructions] : []
         if let instructions = request.instructions?.trimmingCharacters(in: .whitespacesAndNewlines),
             !instructions.isEmpty
         {

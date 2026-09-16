@@ -236,6 +236,16 @@ match the visible row order**, including the card at index 0 when present — th
 for every compact↔expanded resize, so only the height changes and the top edge never drifts. The
 anchor is dropped on hide, so the next summon re-resolves for wherever the user is then.
 
+**The AI Chat bar is the one summon that may grow *up*.** `toggleAIBar` gives it its own anchor
+(`AppSettings.aiBarPosition`) and, when the bar sits low enough that a downward transcript would run
+off the display, `positionPanel` holds the bar's *bottom* edge fixed and grows the height upward
+instead — publishing the direction as `PaletteState.aiBarGrowsUp`, which `RootPaletteView` reads to
+dock the composer at the bottom with the transcript above it — and its model and reasoning dropdowns
+then open upward too, through a `MenuPanelCorner.aboveHeaderTrailing` that mirrors the usual
+`belowHeaderTrailing`. `windowDidMove` and `endDrag` derive the anchor from whichever edge is fixed,
+so an upward resize or a drag across the fold can't re-anchor to the moving top. Every other surface
+keeps the top edge and grows down, exactly as before.
+
 All of the arithmetic lives in `PalettePlacement`, which is CoreGraphics-only and takes every screen
 fact as a parameter, so `palette-placement-test` drives the shipped rules rather than a copy of them.
 

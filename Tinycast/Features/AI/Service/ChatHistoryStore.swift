@@ -10,6 +10,10 @@ private let chatSQLiteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.
 final class ChatHistoryStore {
     private(set) var conversations: [ChatConversation] = []
     private(set) var isAvailable = true
+    /// The Assistant whose conversations are resident and saved; nil is the default bar. An ephemeral
+    /// scope never writes to disk.
+    private(set) var scope: UUID?
+    private var ephemeral = false
 
     private static let schema = """
         PRAGMA foreign_keys = ON;
@@ -19,7 +23,8 @@ final class ChatHistoryStore {
           preview TEXT NOT NULL,
           created_at REAL NOT NULL,
           updated_at REAL NOT NULL,
-          message_count INTEGER NOT NULL
+          message_count INTEGER NOT NULL,
+          assistant_id TEXT
         );
         CREATE TABLE IF NOT EXISTS messages(
           id TEXT PRIMARY KEY NOT NULL,
@@ -83,10 +88,11 @@ final class ChatHistoryStore {
         guard ensureDatabase(), let database else { return }
         let sql = """
             SELECT id, title, preview, created_at, updated_at, message_count
-            FROM conversations ORDER BY updated_at DESC;
+            FROM conversations WHERE assistant_id IS ? ORDER BY updated_at DESC;
             """
         guard let statement = prepare(sql, in: database) else { return }
         defer { sqlite3_finalize(statement) }
+        bindScope(to: statement, at: 1)
         var loaded: [ChatConversation] = []
         while sqlite3_step(statement) == SQLITE_ROW {
             guard let id = UUID(uuidString: text(statement, 0)) else { continue }
@@ -98,6 +104,22 @@ final class ChatHistoryStore {
                     messageCount: Int(sqlite3_column_int64(statement, 5))))
         }
         conversations = loaded
+    }
+
+    /// Re-point the store at an Assistant's conversations (nil is the default bar) and reload their
+    /// summaries. An ephemeral scope keeps nothing on disk.
+    func setScope(_ id: UUID?, ephemeral: Bool) {
+        guard scope != id || self.ephemeral != ephemeral else { return }
+        scope = id
+        self.ephemeral = ephemeral
+        load()
+    }
+
+    /// Binds the current scope, or NULL, so `assistant_id IS ?` matches the default bar too.
+    private func bindScope(to statement: OpaquePointer, at index: Int32) {
+        if let scope { bind(scope.uuidString, to: statement, at: index) } else {
+            sqlite3_bind_null(statement, index)
+        }
     }
 
     /// Off means fully off: the handle and the resident summaries go, the file on disk stays.
@@ -146,14 +168,8 @@ final class ChatHistoryStore {
                 let role = ChatMessage.Role(rawValue: text(messagesStatement, 1)),
                 let storedState = ChatMessage.State(rawValue: text(messagesStatement, 3))
             else { continue }
-            var body = text(messagesStatement, 2)
-            let state: ChatMessage.State
-            if storedState == .streaming {
-                state = .failed
-                if body.isEmpty { body = "Response interrupted." }
-            } else {
-                state = storedState
-            }
+            let body = text(messagesStatement, 2)
+            let state: ChatMessage.State = storedState == .streaming ? .interrupted : storedState
             messages.append(
                 ChatMessage(
                     id: messageID, role: role, text: body, state: state,
@@ -168,7 +184,7 @@ final class ChatHistoryStore {
     }
 
     func save(_ session: ChatSession) {
-        guard !session.messages.isEmpty, ensureDatabase(), let database else { return }
+        guard !session.messages.isEmpty, !ephemeral, ensureDatabase(), let database else { return }
         guard sqlite3_exec(database, "BEGIN IMMEDIATE", nil, nil, nil) == SQLITE_OK else { return }
         guard saveConversation(session, in: database), rewriteTail(of: session, database: database)
         else {
@@ -199,6 +215,18 @@ final class ChatHistoryStore {
             sqlite3_exec(database, "DELETE FROM conversations", nil, nil, nil) == SQLITE_OK
         else { return }
         conversations = []
+    }
+
+    /// Delete every conversation belonging to one Assistant — the whole scope goes when it is removed.
+    /// Cascades to its messages via the foreign key.
+    func deleteScope(_ id: UUID) {
+        guard ensureDatabase(), let database,
+            let statement = prepare("DELETE FROM conversations WHERE assistant_id = ?;", in: database)
+        else { return }
+        defer { sqlite3_finalize(statement) }
+        bind(id.uuidString, to: statement, at: 1)
+        guard sqlite3_step(statement) == SQLITE_DONE else { return }
+        if scope == id { conversations = [] }
     }
 
     /// Inline BLOBs make this the one store where a delete frees pages without shrinking the file.
@@ -242,14 +270,16 @@ final class ChatHistoryStore {
             isAvailable = false
             return false
         }
+        // A NULL-preserving migration for a database that predates the column; harmless once it has it.
+        sqlite3_exec(database, "ALTER TABLE conversations ADD COLUMN assistant_id TEXT;", nil, nil, nil)
         isAvailable = true
         return true
     }
 
     private func saveConversation(_ session: ChatSession, in database: OpaquePointer) -> Bool {
         let sql = """
-            INSERT INTO conversations(id, title, preview, created_at, updated_at, message_count)
-            VALUES(?, ?, ?, ?, ?, ?)
+            INSERT INTO conversations(id, title, preview, created_at, updated_at, message_count, assistant_id)
+            VALUES(?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
               title = excluded.title,
               preview = excluded.preview,
@@ -265,6 +295,7 @@ final class ChatHistoryStore {
         sqlite3_bind_double(statement, 4, summary.createdAt.timeIntervalSince1970)
         sqlite3_bind_double(statement, 5, summary.updatedAt.timeIntervalSince1970)
         sqlite3_bind_int64(statement, 6, Int64(summary.messageCount))
+        bindScope(to: statement, at: 7)
         return sqlite3_step(statement) == SQLITE_DONE
     }
 

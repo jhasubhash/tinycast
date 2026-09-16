@@ -47,15 +47,39 @@ final class MCPCoordinator {
         return store.enabledServers.first { $0.slug == slug }
     }
 
-    /// What this turn may reach: everything enabled, or one server when `@slug` named it.
-    func tools(scopedTo slug: String?) -> [AITool] {
+    /// What this turn may reach: everything enabled, one server when `@slug` names it, and — when an
+    /// Assistant is active — only the servers it enabled (`allowed`). Nil `allowed` is the default bar.
+    func tools(scopedTo slug: String?, allowed: Set<UUID>? = nil) -> [AITool] {
         guard isActive else { return [] }
         return manager.tools
             .filter { tool in
                 guard slug == nil || tool.serverSlug == slug else { return false }
+                guard allowed == nil || allowed?.contains(tool.serverID) == true else { return false }
                 return store.server(id: tool.serverID)?.trust != .never
             }
             .map(\.aiTool)
+    }
+
+    /// The Assistant's enabled + allowed MCP servers (trust != never) as a neutral list a CLI route can
+    /// format for itself. Secrets are read from the Keychain here, so they never touch a backup.
+    func cliServers(allowed: Set<UUID>) -> [AICLIMCPServer] {
+        guard isActive else { return [] }
+        let secrets = MCPSecretStore()
+        return store.enabledServers
+            .filter { allowed.contains($0.id) && $0.trust != .never }
+            .map { server -> AICLIMCPServer in
+                let secret = secrets.secrets(for: server.id)
+                let transport: AICLIMCPServer.Transport
+                switch server.transport {
+                case .stdio(let command, let arguments, _):
+                    transport = .stdio(command: command, arguments: arguments)
+                case .http(let url, let headerName):
+                    transport = .http(url: url, headerName: headerName)
+                }
+                return AICLIMCPServer(
+                    slug: server.slug, transport: transport,
+                    headerValue: secret.headerValue, environment: secret.environment)
+            }
     }
 
     func invoke(_ call: AIToolCall, in chat: UUID) async -> AIToolResult {

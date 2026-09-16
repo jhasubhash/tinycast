@@ -6,7 +6,10 @@ struct ChatTranscriptView: View {
     @Environment(\.metrics) private var metrics
     let messages: [ChatMessage]
     let status: String?
+    let showReasoning: Bool
     let usage: AIUsage?
+    /// True while the streaming reply is in a reasoning phase — re-shown each time it thinks again.
+    let thinking: Bool
     /// Cleared when the reader scrolls up, so a streaming reply stops dragging them back down.
     @State private var followsTail = true
 
@@ -27,7 +30,9 @@ struct ChatTranscriptView: View {
                     ForEach(messages) { message in
                         ChatMessageView(
                             message: message,
-                            status: message.id == messages.last?.id ? status : nil
+                            showReasoning: showReasoning,
+                            status: message.id == messages.last?.id ? status : nil,
+                            thinking: thinking && message.id == messages.last?.id
                         )
                         .id(message.id)
                     }
@@ -110,7 +115,10 @@ private struct ChatMessageView: View {
 
     @Environment(\.metrics) private var metrics
     let message: ChatMessage
+    let showReasoning: Bool
     let status: String?
+    /// Live while the model is thinking; false for any settled or non-last message.
+    let thinking: Bool
 
     @State private var hovered = false
 
@@ -154,12 +162,13 @@ private struct ChatMessageView: View {
     }
 
     @ViewBuilder private var content: some View {
+        let showsReasoning = showReasoning && !message.reasoning.isEmpty
         if message.text.isEmpty, message.searches.isEmpty, message.toolUses.isEmpty,
-            message.state == .streaming
+            !showsReasoning, message.state == .streaming
         {
             HStack(spacing: metrics.spacing.sm) {
                 ProgressView().controlSize(.small)
-                if let status { Text(status).foregroundStyle(.secondary) }
+                Text(status ?? "Thinking…").foregroundStyle(.secondary)
             }
             .padding(metrics.spacing.md)
         } else {
@@ -194,10 +203,36 @@ private struct ChatMessageView: View {
                     }
                 }
             }
+            if showReasoning, !message.reasoning.isEmpty {
+                ChatReasoningView(reasoning: message.reasoning, thinking: thinking)
+            }
             if !message.text.isEmpty || !message.searches.isEmpty || !message.toolUses.isEmpty {
                 rendered
             }
+            if thinking, !showReasoning || message.reasoning.isEmpty {
+                thinkingIndicator
+            }
+            if message.state == .interrupted {
+                interruptedBadge
+            }
         }
+    }
+
+    /// The live reasoning cue for routes that stream no reasoning text to fold into a section.
+    private var thinkingIndicator: some View {
+        HStack(spacing: metrics.spacing.sm) {
+            ProgressView().controlSize(.small)
+            Text("Thinking…").foregroundStyle(.secondary)
+        }
+    }
+
+    /// A settled cue for a reply the user stopped — distinct from an error, and never a spinner.
+    private var interruptedBadge: some View {
+        HStack(spacing: metrics.spacing.sm) {
+            Image(systemName: "stop.circle")
+            Text("Interrupted")
+        }
+        .foregroundStyle(Theme.Colors.textSecondary)
     }
 
     /// Only a reply is markdown — what the user typed is shown back exactly as they typed it.
@@ -217,6 +252,45 @@ private struct ChatMessageView: View {
             }
         } else {
             Text(message.text)
+        }
+    }
+}
+
+/// The model's live reasoning: streamed open while it thinks, folded away once the answer begins.
+private struct ChatReasoningView: View {
+    @Environment(\.metrics) private var metrics
+    let reasoning: String
+    let thinking: Bool
+    @State private var expanded = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: metrics.spacing.xs) {
+            Button {
+                withAnimation(.easeOut(duration: Theme.Duration.hover)) { expanded.toggle() }
+            } label: {
+                HStack(spacing: metrics.spacing.xs) {
+                    if thinking {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                    }
+                    Text(thinking ? "Thinking…" : "Reasoning")
+                }
+                .font(metrics.typography.rowTrailing)
+                .foregroundStyle(Theme.Colors.textTertiary)
+            }
+            .buttonStyle(.plain)
+            if expanded {
+                Text(reasoning)
+                    .font(metrics.typography.rowTrailing)
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        // Track the live reasoning phase: unfold while it thinks, fold once the answer resumes.
+        .onChange(of: thinking) { _, nowThinking in
+            withAnimation(.easeOut(duration: Theme.Duration.hover)) { expanded = nowThinking }
         }
     }
 }

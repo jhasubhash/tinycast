@@ -55,6 +55,8 @@ final class AppCore {
     let aiSettings = AISettingsStore(
         isAppleIntelligenceAvailable: { AppleIntelligenceProvider.status().isAvailable })
     let mcpSettings = MCPSettingsStore()
+    let assistants = AssistantStore()
+    let skills: SkillStore
     let mcp = MCPServerManager()
     let quickActionSettings = QuickActionSettingsStore()
     let customQuickActions = CustomQuickActionStore()
@@ -181,8 +183,10 @@ final class AppCore {
     @ObservationIgnored private(set) lazy var mcpCoordinator = MCPCoordinator(
         settings: settings, store: mcpSettings, manager: mcp, core: self)
     @ObservationIgnored private(set) lazy var aiChatCoordinator = AIChatCoordinator(
-        chat: aiChat, settings: settings, appIndex: appIndex, palette: palette,
-        paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
+        chat: aiChat, history: chatHistory, scope: .dynamic, settings: settings, appIndex: appIndex,
+        palette: palette, paletteCoordinator: paletteCoordinator,
+        settingsCoordinator: settingsCoordinator, core: self)
+    @ObservationIgnored private(set) lazy var aiChatWindowController = AIChatWindowController(
         core: self)
 
     @ObservationIgnored private lazy var windowController = PaletteWindowController(core: self)
@@ -195,6 +199,8 @@ final class AppCore {
         let launcherRanking = LauncherRankingStore()
         let settings = AppSettings()
         let chatHistory = ChatHistoryStore(directory: AppPaths.applicationSupport())
+        skills = SkillStore(
+            directory: AppPaths.applicationSupport().appendingPathComponent("skills", isDirectory: true))
         self.launcherRanking = launcherRanking
         self.settings = settings
         self.chatHistory = chatHistory
@@ -242,6 +248,9 @@ final class AppCore {
             notesCoordinator.applyEnabled()
             aiChatCoordinator.applyEnabled()
             mcpCoordinator.applyEnabled()
+            assistants.onChange = { [weak self] _ in
+                self?.aiChatCoordinator.applyAssistantsPresence()
+            }
             customQuickActions.onChange = { [weak self] _ in
                 self?.quickActionCoordinator.applyCustomQuickActionsPresence()
             }
@@ -284,10 +293,12 @@ final class AppCore {
             snippetListener.healthTicker = healthTicker
 
             hotKeys.onTogglePalette = { [weak self] in self?.paletteCoordinator.togglePalette() }
+            hotKeys.onToggleAIBar = { [weak self] in self?.aiChatCoordinator.toggleBar() }
             hotKeys.onRunCommand = { [weak self] id in self?.launcherCoordinator.runCommand(id) }
             hotKeys.onRunCustomCommand = { [weak self] id in
                 self?.customCommandCoordinator.runCustomCommand(id: id)
             }
+            hotKeys.onOpenAssistant = { [weak self] id in self?.aiChatCoordinator.openAssistant(id: id) }
             hotKeys.onRunSystemAction = { [weak self] id in
                 self?.systemActionCoordinator.runSystemAction(id: id)
             }
@@ -336,7 +347,8 @@ final class AppCore {
                 customCommandIDs: Set(customCommands.commands.map(\.id)),
                 quicklinkIDs: Set(quicklinks.quicklinks.map(\.id)),
                 windowLayoutIDs: Set(windowLayouts.layouts.map(\.id)),
-                quickActionIDs: Set(customQuickActions.actions.map(\.id)))
+                quickActionIDs: Set(customQuickActions.actions.map(\.id)),
+                assistantIDs: Set(assistants.assistants.map(\.id)))
             // Keeps running while Carbon pauses: the recorder needs its rewritten flags.
             hyperKeyTap.start(settings: settings)
 
@@ -406,6 +418,8 @@ final class AppCore {
             return quicklinks.quicklink(id: id)?.name
         case .quickAction(let id):
             return customQuickActions.action(id: id)?.name
+        case .assistant(let id):
+            return assistants.assistant(id: id)?.name
         case .windowLayout(let id):
             return windowLayouts.layout(id: id)?.name
         case .appleShortcut(let id):
@@ -414,7 +428,7 @@ final class AppCore {
             return appIndex.apps.first { $0.kind == .extensionCommand && $0.id == entryID }?.name
         case .pluginCommand(let entryID):
             return appIndex.apps.first { $0.kind == .plugin && $0.id == entryID }?.name
-        case .togglePalette, .command, .systemAction, .windowCommand:
+        case .togglePalette, .toggleAIBar, .command, .systemAction, .windowCommand:
             return nil
         }
     }
@@ -459,6 +473,7 @@ final class AppCore {
         snippetListener.stop()
         snippetsStore.stop()
         aiChat.cancel()
+        aiChatWindowController.closeAll()
         chatGPTSubscription.stop()
         mcp.stop()
         installedAI.stop()
@@ -482,9 +497,19 @@ final class AppCore {
         return Task { for task in tasks { await task.value } }
     }
 
-    func aiProvider() throws -> any AIProvider {
+    func aiProvider(cliTools: AICLIToolConfig? = nil) throws -> any AIProvider {
         try AIProviderFactory.make(
-            settings: aiSettings, subscription: chatGPTSubscription, installedAI: installedAI)
+            settings: aiSettings, subscription: chatGPTSubscription, installedAI: installedAI,
+            cliTools: cliTools)
+    }
+
+    /// Chat's route for a specific selection — an Assistant's chosen model, distinct from the default.
+    func aiProvider(for selection: AIModelSelection, cliTools: AICLIToolConfig? = nil) throws
+        -> any AIProvider
+    {
+        try AIProviderFactory.make(
+            selection: selection, settings: aiSettings, subscription: chatGPTSubscription,
+            installedAI: installedAI, cliTools: cliTools)
     }
 
     /// Permissive guardrails: the text transformed is the reader's own, which `.default` refuses.
@@ -541,6 +566,9 @@ final class AppCore {
             })
         track({ _ = $0.notesEnabled }, reproject: { $0.notesCoordinator.applyEnabled() })
         track({ _ = $0.aiEnabled }, reproject: { $0.aiChatCoordinator.applyEnabled() })
+        track(
+            { _ = $0.aiAssistantsShowInLauncher },
+            reproject: { $0.aiChatCoordinator.applyAssistantsPresence() })
         track(
             {
                 _ = $0.aiEnabled

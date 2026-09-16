@@ -26,12 +26,12 @@ struct AIScreen: PaletteScreen {
                 })
         }
         items.append(
-            PopoverMenuItem(title: "New Chat", systemImage: "plus.bubble") {
+            PopoverMenuItem(title: "New Chat", systemImage: "plus.bubble", shortcut: "⌘N") {
                 coordinator.startNewChat()
             })
         if chat.lastAssistantText != nil {
             items.append(
-                PopoverMenuItem(title: "Copy Last Response", systemImage: "doc.on.doc", startsSection: true) {
+                PopoverMenuItem(title: "Copy Last Response", systemImage: "doc.on.doc", startsSection: true, shortcut: "⇧⌘C") {
                     coordinator.copyLastResponse()
                 })
         }
@@ -46,13 +46,20 @@ struct AIScreen: PaletteScreen {
         }
         items.append(
             PopoverMenuItem(
-                title: "Chat History", systemImage: "clock.arrow.circlepath", startsSection: true
+                title: "Chat History", systemImage: "clock.arrow.circlepath", startsSection: true,
+                shortcut: "⌘Y"
             ) {
                 coordinator.showHistory()
             })
         items.append(
-            PopoverMenuItem(title: "AI Settings", systemImage: "slider.horizontal.3") {
+            PopoverMenuItem(title: "AI Settings", systemImage: "slider.horizontal.3", shortcut: "⌘,") {
                 coordinator.showSettings()
+            })
+        items.append(
+            PopoverMenuItem(
+                title: "Pop Out", systemImage: "macwindow.badge.plus", startsSection: true
+            ) {
+                coordinator.popOut()
             })
         return PopoverMenuContent(header: chat.session.title, items: items)
     }
@@ -95,14 +102,16 @@ struct AIScreen: PaletteScreen {
         AnyView(
             AIChatView(
                 chat: chat, settings: settings, availability: coordinator.availability,
+                showReasoning: coordinator.activeAssistant?.showReasoning ?? settings.showReasoning,
                 onConfigure: coordinator.showSettings, onAppear: coordinator.prepareForChat))
     }
 }
 
-private struct AIChatView: View {
+struct AIChatView: View {
     let chat: AIChatState
     let settings: AISettingsStore
     let availability: () -> String?
+    let showReasoning: Bool
     let onConfigure: () -> Void
     let onAppear: () -> Void
     @State private var unavailability: String?
@@ -118,7 +127,9 @@ private struct AIChatView: View {
                 ChatTranscriptView(
                     messages: chat.session.messages,
                     status: chat.liveStatus,
-                    usage: chat.usage)
+                    showReasoning: showReasoning,
+                    usage: chat.usage,
+                    thinking: chat.isReasoning)
             }
         }
         .onAppear {
@@ -129,7 +140,7 @@ private struct AIChatView: View {
     }
 }
 
-private struct AIEmptyState: View {
+struct AIEmptyState: View {
 
     @Environment(\.metrics) private var metrics
     let message: String?
@@ -379,5 +390,33 @@ struct AIReasoningButton: View {
             action: action
         )
         .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+/// The chat bar's ⌘K control, wearing the footer's own `Actions ⌘ K` face — the composer docks at
+/// the bottom there, so the actions the footer would carry sit inline by the model name instead.
+struct AIActionsButton: View {
+    let isOpen: Bool
+    let action: () -> Void
+    @Environment(\.metrics) private var metrics
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: metrics.spacing.xs) {
+                Text("Actions")
+                    .font(metrics.typography.bar)
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                KeyCapChip(text: "⌘", style: .outline)
+                KeyCapChip(text: "K", style: .outline)
+            }
+            .padding(.horizontal, metrics.spacing.sm)
+            .frame(height: metrics.size.barButtonHeight)
+            .contentShape(Capsule())
+            .background(Capsule().fill(hovered || isOpen ? Theme.Colors.rowHover : .clear))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .fixedSize()
     }
 }

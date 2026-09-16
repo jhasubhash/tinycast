@@ -160,8 +160,8 @@ state on `AppCore`, and gates itself with an `applyEnabled()` / `apply<Feature>P
 
 ## 7. The launcher & the `AppEntry.Kind` spine
 
-Everything launchable is one `AppEntry` tagged by **`AppEntry.Kind`** (**13 cases**: `application`,
-`systemSettings`, `command`, `quickAction`, `customCommand`, `snippet`, `systemAction`,
+Everything launchable is one `AppEntry` tagged by **`AppEntry.Kind`** (**14 cases**: `application`,
+`systemSettings`, `command`, `quickAction`, `customCommand`, `assistant`, `snippet`, `systemAction`,
 `windowCommand`, `windowLayout`, `quicklink`, `extensionCommand`, `meeting`, `plugin`). Detail:
 [docs/features/launcher.md](docs/features/launcher.md).
 

@@ -231,8 +231,9 @@ struct CodexInstalledProvider: AIProvider {
     let turns: CodexTurnRunner
     let model: String
     let effort: String?
+    var toolConfig: AICLIToolConfig?
 
     func stream(_ request: AIRequest) -> AIProviderStream {
-        turns.stream(request, model: model, effort: effort)
+        turns.stream(request, model: model, effort: effort, toolConfig: toolConfig)
     }
 }

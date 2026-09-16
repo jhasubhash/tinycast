@@ -4,6 +4,8 @@ import Foundation
 enum HotKeyAction: Hashable, Sendable {
     /// The one fixed action with no command row of its own.
     case togglePalette
+    /// The floating AI Chat bar; also fixed, and shares the launcher's chat and history.
+    case toggleAIBar
     /// Parameterised over the catalog, so a new built-in command is bindable with no case here.
     case command(CommandID)
     case app(bundleID: String)
@@ -15,6 +17,8 @@ enum HotKeyAction: Hashable, Sendable {
     case quicklink(id: UUID)
     case quickAction(id: UUID)
     case appleShortcut(id: UUID)
+    /// A user-created Assistant chat bar, keyed by its stable id.
+    case assistant(id: UUID)
     /// Keyed by `AppEntry.id`, which is what survives a reinstall of the extension.
     case extensionCommand(entryID: String)
     /// Keyed by `AppEntry.id`, which survives a reinstall of the plugin.
@@ -24,6 +28,7 @@ enum HotKeyAction: Hashable, Sendable {
     var defaultsKey: String {
         switch self {
         case .togglePalette: "hotkey.togglePalette"
+        case .toggleAIBar: "hotkey.toggleAIBar"
         case .command(let id): "hotkey." + id.rawValue
         case .app(let bundleID): "hotkey.app." + bundleID
         case .settingsPane(let bundleID): "hotkey.pane." + bundleID
@@ -34,6 +39,7 @@ enum HotKeyAction: Hashable, Sendable {
         case .quicklink(let id): "hotkey.quicklink." + id.uuidString.lowercased()
         case .quickAction(let id): "hotkey.quickAction." + id.uuidString.lowercased()
         case .appleShortcut(let id): "hotkey.appleShortcut." + id.uuidString.lowercased()
+        case .assistant(let id): "hotkey.assistant." + id.uuidString.lowercased()
         case .extensionCommand(let entryID): "hotkey.extensionCommand." + entryID
         case .pluginCommand(let entryID): "hotkey.pluginCommand." + entryID
         }
@@ -41,5 +47,5 @@ enum HotKeyAction: Hashable, Sendable {
 
     /// The fixed actions every install can bind; the per-item catalogs extend them at launch.
     static let builtInActions: [HotKeyAction] =
-        [.togglePalette] + CommandID.allCases.compactMap(\.hotKeyAction)
+        [.togglePalette, .toggleAIBar] + CommandID.allCases.compactMap(\.hotKeyAction)
 }

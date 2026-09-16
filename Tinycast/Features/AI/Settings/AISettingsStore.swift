@@ -16,6 +16,10 @@ final class AISettingsStore {
     var webSearchEnabled: Bool {
         didSet { defaults.set(webSearchEnabled, forKey: AppSettingsKey.aiWebSearch.rawValue) }
     }
+    /// On by default: a model that reasons silently looks hung, so its thinking streams by default.
+    var showReasoning: Bool {
+        didSet { defaults.set(showReasoning, forKey: AppSettingsKey.aiShowReasoning.rawValue) }
+    }
     /// Appended to `AIInstructions.preamble` on every turn, so it is billed on every turn.
     var systemPrompt: String {
         didSet { defaults.set(systemPrompt, forKey: AppSettingsKey.aiSystemPrompt.rawValue) }
@@ -65,6 +69,8 @@ final class AISettingsStore {
             defaults.data(forKey: AppSettingsKey.aiDefaultModel.rawValue))
         webSearchEnabled =
             defaults.object(forKey: AppSettingsKey.aiWebSearch.rawValue) as? Bool ?? false
+        showReasoning =
+            defaults.object(forKey: AppSettingsKey.aiShowReasoning.rawValue) as? Bool ?? true
         systemPrompt = defaults.string(forKey: AppSettingsKey.aiSystemPrompt.rawValue) ?? ""
         systemPromptEnabled =
             defaults.object(forKey: AppSettingsKey.aiSystemPromptEnabled.rawValue) as? Bool ?? true
@@ -180,6 +186,9 @@ final class AISettingsStore {
         case .openCode:
             defaultModel = .openCode(
                 model: replacement.id, effort: replacement.resolvedEffort(nil))
+        case .copilot:
+            defaultModel = .copilot(
+                model: replacement.id, effort: replacement.resolvedEffort(nil))
         case .codex: break
         }
     }
@@ -204,7 +213,9 @@ final class AISettingsStore {
         guard let source = defaultModel?.source else { return }
         let matches =
             switch (kind, source) {
-            case (.codex, .codex), (.claude, .claude), (.openCode, .openCode): true
+            case (.codex, .codex), (.claude, .claude), (.openCode, .openCode),
+                (.copilot, .copilot):
+                true
             default: false
             }
         guard matches else { return }

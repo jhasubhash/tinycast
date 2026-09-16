@@ -314,7 +314,7 @@ enum SettingsSearchCatalog {
             .quickActionsModel, "Model",
             keywords: ["llm", "ai", "default"]),
         .init(
-            .quickActionsTranslate, "Translate to",
+            group: .quickActionsTranslate, "Translate to",
             keywords: ["language", "locale"])
     ]
 

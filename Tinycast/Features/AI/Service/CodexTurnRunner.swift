@@ -13,6 +13,11 @@ final class CodexTurnRunner {
         source as a markdown link whose text is the publication's name, never "Read more" or a URL.
         """
     private static let noWebSearchInstructions = "Never access external resources."
+    private static let toolInstructions = """
+        You are providing text generation inside Tinycast. You may call the MCP tools provided to \
+        you when they help answer the request; use only those tools, never run shell commands or read \
+        the local filesystem. Report tool results plainly.
+        """
 
     var connect: (@MainActor () async throws -> [ChatGPTSubscription.Model])?
     var onTurnEnded: (@MainActor () -> Void)?
@@ -34,12 +39,15 @@ final class CodexTurnRunner {
 
     var isActive: Bool { activeThreadID != nil }
 
-    nonisolated func stream(_ request: AIRequest, model: String, effort: String?) -> AIProviderStream {
+    nonisolated func stream(
+        _ request: AIRequest, model: String, effort: String?, toolConfig: AICLIToolConfig? = nil
+    ) -> AIProviderStream {
         AIProviderStream { continuation in
             let token = TurnToken()
             let task = Task { [weak self] in
                 await self?.startTurn(
-                    request, model: model, effort: effort, continuation: continuation, token: token)
+                    request, model: model, effort: effort, toolConfig: toolConfig,
+                    continuation: continuation, token: token)
             }
             continuation.onTermination = { [weak self] _ in
                 task.cancel()
@@ -72,7 +80,7 @@ final class CodexTurnRunner {
             guard let item = params["item"]?.objectValue else { return }
             switch item["type"]?.stringValue {
             case "webSearch": activeContinuation?.yield(.searching(item["query"]?.stringValue))
-            case "reasoning": activeContinuation?.yield(.thinking)
+            case "reasoning": activeContinuation?.yield(.thinking(""))
             default: break
             }
         case "item/completed":
@@ -129,6 +137,7 @@ final class CodexTurnRunner {
         _ request: AIRequest,
         model: String,
         effort: String?,
+        toolConfig: AICLIToolConfig? = nil,
         continuation: AIProviderStream.Continuation,
         token: TurnToken
     ) async {
@@ -173,8 +182,9 @@ final class CodexTurnRunner {
                     "sandbox": "read-only",
                     "ephemeral": true,
                     // Thread-scoped so this request never writes the user's saved web-search choice.
-                    "config": ["web_search": request.webSearch ? "live" : "disabled"],
-                    "developerInstructions": developerInstructions(for: request)
+                    "config": threadConfig(for: request, toolConfig: toolConfig),
+                    "developerInstructions": developerInstructions(
+                        for: request, toolConfig: toolConfig)
                 ])
             guard let thread = threadResponse["thread"]?.objectValue,
                 let threadID = thread["id"]?.stringValue
@@ -193,11 +203,12 @@ final class CodexTurnRunner {
                     params: ["threadId": threadID, "items": history])
             }
             // An unstructured child survives Stop, so the turn ID it returns can be interrupted.
+            // Tools need the MCP servers to be reachable; without them the sandbox has no network.
             var turnParameters: [String: Any] = [
                 "threadId": threadID,
                 "model": model,
                 "approvalPolicy": "never",
-                "sandboxPolicy": ["type": "readOnly", "networkAccess": false],
+                "sandboxPolicy": ["type": "readOnly", "networkAccess": toolConfig != nil],
                 "input": turnInput(for: request.messages[promptIndex])
             ]
             if let effort { turnParameters["effort"] = effort }
@@ -229,7 +240,15 @@ final class CodexTurnRunner {
         }
     }
 
-    private func developerInstructions(for request: AIRequest) -> String {
+    /// `thread/start`'s config: the web-search choice always, plus the Assistant's MCP servers when the
+    /// CLI-tools opt-in is on. Codex spawns/reaches the servers itself from this map.
+    private func threadConfig(for request: AIRequest, toolConfig: AICLIToolConfig?) -> [String: Any] {
+        var config: [String: Any] = ["web_search": request.webSearch ? "live" : "disabled"]
+        if let toolConfig { config["mcp_servers"] = toolConfig.codexMCPServers }
+        return config
+    }
+
+    private func developerInstructions(for request: AIRequest, toolConfig: AICLIToolConfig?) -> String {
         let requestInstructions =
             ([request.instructions]
             + request.messages.compactMap {
@@ -240,7 +259,9 @@ final class CodexTurnRunner {
                 return trimmed.isEmpty ? nil : trimmed
             }
         let search = request.webSearch ? Self.webSearchInstructions : Self.noWebSearchInstructions
-        return ([Self.safetyInstructions, search] + requestInstructions).joined(separator: "\n\n")
+        // Tools flip the guardrail: call the provided MCP tools, still no shell or filesystem.
+        let base = toolConfig == nil ? Self.safetyInstructions : Self.toolInstructions
+        return ([base, search] + requestInstructions).joined(separator: "\n\n")
     }
 
     private func turnInput(for message: AIMessage) -> [[String: Any]] {
