@@ -498,6 +498,12 @@ run installed-ai-test     Tinycast/Features/AI/Model/*.swift \
                           Tinycast/Features/AI/Service/AIProvider.swift \
                           Tinycast/Platform/ExecutableLocator.swift \
                           Tinycast/Features/AI/Service/InstalledCLIProvider.swift
+run assistant-store-test   Tinycast/Features/Settings/AppSettingsKey.swift \
+                           Tinycast/Features/AI/Model/*.swift \
+                           Tinycast/Features/AI/Service/AssistantStore.swift \
+                           Tinycast/Features/AI/Service/SkillStore.swift
+run plugin-catalog-test    Tinycast/Platform/AppPaths.swift \
+                           Tinycast/Features/Plugins/Service/PluginCatalog.swift
 
 if [ "$emit_db" -eq 1 ]; then
     printf ']\n' >> "$DB"

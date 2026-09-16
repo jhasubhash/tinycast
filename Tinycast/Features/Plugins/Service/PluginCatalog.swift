@@ -40,8 +40,7 @@ enum PluginCatalog {
 
     /// A directory without a readable `manifest.json` whose dylib exists on disk is skipped, not an
     /// error: a half-copied install simply doesn't appear.
-    nonisolated static func scan() -> [PluginInstall] {
-        let root = pluginsDirectory()
+    nonisolated static func scan(root: URL = PluginCatalog.pluginsDirectory()) -> [PluginInstall] {
         let dirs =
             (try? FileManager.default.contentsOfDirectory(
                 at: root, includingPropertiesForKeys: [.isDirectoryKey],
