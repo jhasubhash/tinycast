@@ -3,7 +3,7 @@
 How to check that a change holds up. Tinycast has no XCTest target and no UI test suite: the
 automated half is a set of standalone harnesses, and the manual half is the sweep at the bottom of
 this file. A change to a screen, plugin or extension is driven and captured instead —
-[UI_TESTS.md](../UI_TESTS.md) owns that procedure and the register of UI bugs it came from.
+[UI_TESTS.md](../custom_docs/UI_TESTS.md) owns that procedure and the register of UI bugs it came from.
 
 ## Definition of done
 

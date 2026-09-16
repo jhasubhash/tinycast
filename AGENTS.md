@@ -6,10 +6,10 @@ and an emoji picker. It also **runs Raycast extensions** natively, in JavaScript
 SwiftUI + AppKit, running as an accessory with no Dock icon (`LSUIElement`). Zero third-party
 dependencies.
 
-> **This checkout is a fork.** [CUSTOM.md](CUSTOM.md) covers what is true here and not upstream —
-> the `main`/`custom` branch split (never commit to `main`), the periodic upstream sync, the local
-> build and signing setup, and the register of changes this fork carries. Read it before your first
-> commit; everything below still applies unchanged.
+> **This checkout is a fork.** [CUSTOM.md](custom_docs/CUSTOM.md) covers what is true here and not upstream —
+> the single-branch model (everything lives on `main`; commit to it directly), how to pull upstream
+> changes in by hand, the local build and signing setup, and the register of changes this fork carries.
+> Read it before your first commit; everything below still applies unchanged.
 
 ## Posture: latest-only, always
 
@@ -51,11 +51,11 @@ system-wide chord, and HIToolbox's TIS APIs remain the public input-source mecha
 
 | Read it before you | Doc |
 | --- | --- |
-| commit anything in this fork — branching, upstream sync, local build | [CUSTOM.md](CUSTOM.md) |
+| commit anything in this fork — branching, pulling upstream in, local build | [CUSTOM.md](custom_docs/CUSTOM.md) |
 | change how anything is wired or owned | [architecture.md](docs/architecture.md) |
 | write Swift — naming, style, concurrency, budgets, comments | [standards.md](docs/standards.md) |
 | claim a change is done | [testing.md](docs/testing.md) |
-| claim a **UI** change is done — a screen, plugin or extension | [UI_TESTS.md](UI_TESTS.md) |
+| claim a **UI** change is done — a screen, plugin or extension | [UI_TESTS.md](custom_docs/UI_TESTS.md) |
 | build, run or regenerate data | [development.md](docs/development.md) |
 | add or restyle any view | [ui.md](docs/ui.md) |
 | touch one feature's internals | [features/](docs/features/) — each opens with its invariants |
@@ -136,6 +136,6 @@ Each item is explained in [testing.md](docs/testing.md#definition-of-done).
 - The Debug build compiles with **no new warnings**.
 - `./Scripts/lint.sh` is clean.
 - `grep -rln 'import AppKit\|import SwiftUI\|import Cocoa' Tinycast/Features/*/Model/` returns nothing.
-- A UI change was driven and captured per [UI_TESTS.md](UI_TESTS.md), and any new failure mode is in
+- A UI change was driven and captured per [UI_TESTS.md](custom_docs/UI_TESTS.md), and any new failure mode is in
   its register.
 - Any doc your change made wrong is fixed in the same commit.

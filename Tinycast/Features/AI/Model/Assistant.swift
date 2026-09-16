@@ -3,7 +3,7 @@ import Foundation
 
 /// A named, dedicated AI chat bar — its own shortcut, prompt, model, Skills, MCP servers, history and
 /// placement. Pure and `Codable`: `AssistantStore` persists it, the coordinator reads it. The default
-/// bar (`toggleAIBar`) is deliberately *not* an Assistant. See `Assistant_Architecture.md`.
+/// bar (`toggleAIBar`) is deliberately *not* an Assistant. See `custom_docs/Assistant_Architecture.md`.
 struct Assistant: Identifiable, Codable, Sendable, Equatable {
     let id: UUID
     /// Configured (standard chat UI) or provided by a Swift plugin (custom UI + behaviour).
@@ -146,7 +146,7 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
 }
 
 /// Where an Assistant's UI and behaviour come from — plain config, or a native Swift plugin that renders
-/// its own SwiftUI surface (see `Assistant_Architecture.md` §19).
+/// its own SwiftUI surface (see `custom_docs/Assistant_Architecture.md` §19).
 enum AssistantProvider: Codable, Sendable, Equatable {
     case configured
     case plugin(pluginID: String, descriptorID: String)

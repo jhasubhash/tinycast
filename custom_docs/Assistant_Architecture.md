@@ -1,51 +1,43 @@
 # Assistants
 
-A design for **Assistants** — multiple, user-created, dedicated AI chat bars, each with its own
-shortcut, system prompt, model, **Skills** (Claude Agent Skills) and **MCP servers**, history, and
-screen placement, all remembered across sessions.
+Design for **Assistants**: multiple, user-created AI chat bars, each with its own shortcut, prompt,
+model, **Skills** (Claude Agent Skills), **MCP servers**, history, and screen placement — remembered
+across sessions. Fork-local (see [CUSTOM.md](CUSTOM.md)); extends the AI Chat bar in the `Floating AI
+Chat bar` register row, reusing the existing stack (`AIChatState`, `ChatHistoryStore`,
+`AIChatCoordinator`, `MCPCoordinator`) rather than duplicating it.
 
-This is a fork-local feature (see [CUSTOM.md](CUSTOM.md)); it extends the AI Chat bar shipped in the
-`Floating AI Chat bar` register row. It builds on and reuses the existing AI stack — one `AIChatState`,
-one `ChatHistoryStore`, one `AIChatCoordinator`, the `MCPCoordinator` — rather than duplicating it.
-
-Read [docs/features/ai.md](docs/features/ai.md) and [docs/features/mcp.md](docs/features/mcp.md) first;
-this doc only covers what Assistants add on top.
+Read [docs/features/ai.md](../docs/features/ai.md) and [docs/features/mcp.md](../docs/features/mcp.md)
+first — this doc covers only what Assistants add.
 
 ## 1. What an Assistant is
 
-Today there is one AI bar (`toggleAIBar`, ⌥Space) plus the launcher's `AI Chat` command. They share one
-model, one system prompt, one MCP set and one history. An **Assistant** packages all of that per-persona:
-
-- A **Coding** assistant — a code-review system prompt, the `filesystem` MCP server, a `pdf` skill,
-  GPT‑5‑Sol — summoned on ⌥1, docked bottom-right, resuming its own transcript.
-- A **Writing** assistant — a house-style prompt, no tools, Claude — on ⌥2, centred, fresh each time.
-
-The existing default AI bar stays exactly as it is (decision 3, below); Assistants are additive, so a
-regression in the new path can never touch the old one.
+Today: one AI bar (`toggleAIBar`, ⌥Space) + the launcher's `AI Chat` command — one model, one system
+prompt, one MCP set, one history. An **Assistant** packages all of that per persona — e.g. **Coding**
+(code-review prompt, `filesystem` MCP, `pdf` skill, GPT‑5‑Sol, ⌥1, bottom-right, resumes its transcript)
+vs **Writing** (house-style prompt, no tools, Claude, ⌥2, centred, fresh each time).
 
 ## 2. Terminology
 
 | Term | Meaning |
 | --- | --- |
-| **Assistant** | A named, configured AI chat bar. The user-facing noun (decision 1). Model type `Assistant`. |
+| **Assistant** | A named, configured AI chat bar — the user-facing noun (decision 1); model type `Assistant`. |
 | **Configured assistant** | An Assistant with no code — standard chat UI, driven by its stored prompt/model/skills/MCP (§4–§13). |
 | **Plugin assistant** | An Assistant a **native Swift plugin** provides — its own SwiftUI chat UI and custom behaviour, registered as a chat bar (§19). |
 | **`AssistantSession`** | The host→plugin AI bridge: an observable transcript plus `send`/`stop`/`newChat`, handed to a plugin assistant's surface so it talks to the model without touching host internals (§19). |
-| **Skill** | A **Claude Agent Skill** — a `SKILL.md` file (+ optional bundled resources) with a name, a description, and instruction text. A *library* of skills exists; each assistant enables a subset. Distinct from MCP (decision 2). |
+| **Skill** | A **Claude Agent Skill** — a `SKILL.md` file (+ optional bundled resources): name, description, instruction text. A library exists; each assistant enables a subset. Distinct from MCP (decision 2). |
 | **MCP server** | An existing `MCPServer` (tool provider). Each assistant enables a subset. |
 | **Default bar** | Today's `toggleAIBar` + `AI Chat` command. Unchanged, global settings, unscoped history. Not an Assistant. |
-| **Active assistant** | The one currently shown in the palette's `.ai` screen. `AppCore.activeAssistant: Assistant?` — `nil` means the default bar. |
+| **Active assistant** | The one shown in the palette's `.ai` screen. `AppCore.activeAssistant: Assistant?` — `nil` means the default bar. |
 
 ## 3. Decisions (locked)
 
 1. **Name:** *Assistant*.
-2. **Skills:** Claude Agent Skills (`SKILL.md`), a **separate** subsystem from MCP. **Both** are supported
-   per assistant.
-3. **Default bar kept separate** — it is the "default" and stays unchanged, minimising regression surface.
-4. **History:** one shared `ai-chats.sqlite3`, rows **scoped by assistant id** (a new `assistant_id`
-   column). Not separate DB files.
-5. **All extras** from the proposal are in scope: per-assistant icon/colour, ephemeral mode, per-assistant
-   `opens to`, a launcher command per assistant, per-assistant width/size, and a seed/example prompt.
+2. **Skills:** Claude Agent Skills (`SKILL.md`), a **separate** subsystem from MCP — **both** supported.
+3. **Default bar kept separate** — unchanged, additive; a regression in the new path can't touch it.
+4. **History:** one shared `ai-chats.sqlite3`, rows **scoped by assistant id** (new `assistant_id`
+   column) — not separate DB files.
+5. **All extras** in scope: icon/colour, ephemeral mode, per-assistant `opens to`, a launcher command,
+   width/size, and a seed/example prompt.
 
 ## 4. Data models (pure — `Features/AI/Model/`)
 
@@ -80,9 +72,8 @@ struct Assistant: Identifiable, Codable, Sendable, Equatable {
 
 ### `Skill`
 
-Parsed from a Claude Agent Skill. A skill's **body** is instruction text; a skill *folder* may bundle
-resources. Tinycast copies the whole folder on import, so an assistant with **Allow shell tools** on
-can execute a bundled script itself (see §6.3); everywhere else v1 uses the instruction text only.
+Parsed from a Claude Agent Skill: the **body** is instruction text; the *folder* may bundle
+resources an assistant with **Allow shell tools** can execute (§6.3).
 
 ```swift
 struct Skill: Identifiable, Codable, Sendable, Equatable {
@@ -98,13 +89,12 @@ struct Skill: Identifiable, Codable, Sendable, Equatable {
 
 ### Stores (`Service/`, `@MainActor @Observable`)
 
-- **`AssistantStore`** — `private(set) var assistants: [Assistant]`, persisted as JSON in `UserDefaults`
-  under a new `aiAssistants` key. CRUD + reordering; each mutation persists. Backup-excluded.
-- **`SkillStore`** — `private(set) var skills: [Skill]`, a library scanned from and imported into
-  `application-support/skills/`. Import copies a `SKILL.md` (or a folder containing one), parses the
-  frontmatter and body, uniques the slug. Metadata cached in `UserDefaults` (`aiSkills`); the bodies live
-  on disk and load lazily. Backup-excluded (a skill is instruction content the model is billed for, and a
-  destination for chat context).
+- **`AssistantStore`** — `private(set) var assistants: [Assistant]`, JSON in `UserDefaults` under a
+  new `aiAssistants` key. CRUD + reordering; each mutation persists. Backup-excluded.
+- **`SkillStore`** — `private(set) var skills: [Skill]`, a library imported into
+  `application-support/skills/`. Import copies a `SKILL.md` (or a folder), parses frontmatter + body,
+  uniques the slug; metadata cached in `UserDefaults` (`aiSkills`), bodies load lazily from disk.
+  Backup-excluded — billed instruction content, and a destination for chat context.
 
 ## 5. `SKILL.md` — the Claude Agent Skill format
 
@@ -124,27 +114,24 @@ skill-name/
 name: pdf-forms
 description: Fill, read and flatten PDF forms. Use when the user works with PDF documents.
 ---
-
 # PDF forms
-
 Step-by-step instructions the model should follow when this skill is active…
 ```
 
-- **Required frontmatter:** `name`, `description`. Parsed by a small `SkillFrontmatter` reader (the
-  frontmatter is simple `key: value`; no full YAML needed). `Model/` stays Foundation-only.
-- The **body** (everything after the closing `---`) is the instruction text injected into the request.
-- **Progressive disclosure** (Anthropic's model — inject only name+description, let the model pull the
-  body on demand) is a **future enhancement**; v1 injects curated bodies in full, bounded (see §6.2),
-  because an assistant's skills are hand-picked and few.
+- **Required frontmatter:** `name`, `description` — a small `SkillFrontmatter` reader parses it (simple
+  `key: value`, no full YAML); `Model/` stays Foundation-only.
+- The **body** (after the closing `---`) is the instruction text injected into the request.
+- **Progressive disclosure** (inject only name+description; model pulls the body on demand) is a
+  **future enhancement**; v1 injects curated bodies in full, bounded (§6.2).
 
 ## 6. How Skills and MCP reach the model
 
 ### 6.1 MCP (unchanged mechanism, newly scoped)
 
-`AIChatCoordinator.send` already scopes tools via `MCPCoordinator.tools(scopedTo: slug)`. Add an
-`allowed: Set<UUID>?` parameter so a turn offers only the **active assistant's** MCP servers
-(`allowed = activeAssistant?.mcpServerIDs`; `nil` = the default bar = all enabled servers). `@slug`
-addressing still narrows within that set. MCP tools remain **API-routes-only** per the existing invariant.
+`AIChatCoordinator.send` already scopes tools via `MCPCoordinator.tools(scopedTo: slug)`. Add
+`allowed: Set<UUID>?` so a turn offers only the **active assistant's** MCP servers (`allowed =
+activeAssistant?.mcpServerIDs`; `nil` = default bar = all enabled servers). `@slug` addressing still
+narrows within that set. MCP tools stay **API-routes-only** (existing invariant).
 
 ### 6.2 Skills (new — instruction injection)
 
@@ -157,28 +144,24 @@ preamble
 + "# Skills\n" + for each enabled skill: "## <name>\n<instructions>"   (bounded)
 ```
 
-- One **skills budget** (`AISkillBudget`) caps the injected total, sized per route: ~16 KB on an API
-  route (billed per turn, like the system prompt), ~2 KB on Apple Intelligence (its context holds a
-  prompt + reply together), and ~100 KB on an installed CLI route (Claude/Codex/OpenCode/Copilot ride a
-  paid subscription, not per-token billing, and open a much larger context). Skills are added in library
-  order until the budget fills, then a line notes the rest were omitted.
+One **skills budget** (`AISkillBudget`) caps the injected total per route: ~16 KB API, ~2 KB Apple
+Intelligence, ~100 KB installed CLI (a much larger context — paid-subscription CLIs, not per-token
+billing). Skills add in library order until the budget fills; a line then notes the rest were omitted.
 
 ### 6.3 What skills can and can't do
 
-A skill's **instructions** are all that reach an API or Apple Intelligence route — neither has an
-execution surface, so a bundled script is inert text there. An installed CLI route with **Allow shell
-tools** on is different: the assistant already grants that route full native shell + file access (§
-"Per-assistant CLI shell tools" in `CUSTOM.md`), so it can run a bundled script itself. Because a
-skill's body typically invokes its scripts by a path relative to its own folder (e.g.
-`./scripts/foo.py`), the injected block also names that folder's absolute path in this case
-(`AIInstructions.compose(allowsSkillScripts:)`) so the model can `cd` there before running one. With
-shell tools off, a skill contributes its **instructions** only, exactly as on the API/on-device routes.
+Instructions are all that reach an API or Apple Intelligence route — neither executes, so a bundled
+script is inert text there. An installed CLI route with **Allow shell tools** on has full shell + file
+access (§"Per-assistant CLI shell tools" in `CUSTOM.md`) and can run a bundled script; since scripts
+are invoked via paths relative to the skill folder, the injected block also names that folder's
+absolute path (`AIInstructions.compose(allowsSkillScripts:)`) so the model can `cd` there first. Shell
+tools off ⇒ instructions only, as on the API/on-device routes.
 
 ## 7. Runtime routing — one active assistant re-points the existing stack
 
-No second `AIChatState`. `AppCore.activeAssistant: Assistant?` re-points the single stack; `nil` = default
-bar (today's behaviour, byte-for-byte). `AIChatCoordinator` reads the active assistant in the four places
-it already owns:
+No second `AIChatState`. `AppCore.activeAssistant: Assistant?` re-points the single stack; `nil` =
+default bar (today's behaviour, byte-for-byte). `AIChatCoordinator` reads it in the four places it
+already owns:
 
 ```mermaid
 flowchart LR
@@ -202,44 +185,41 @@ Concretely:
 | retention | `aiSettings.retention` | `a.retention` |
 | placement | `aiBarPosition` | `a.positions` + `a.width` |
 
-The header model/reasoning menus write to **`a.model`** when an assistant is active (persisted on the
-assistant), and to the global default otherwise. `PaletteWindowController.storedPosition/setStoredPosition`
-gain an assistant branch (they already branch aiBar vs launcher). Switching assistants saves the current
-session, re-scopes history, and applies the new one's open policy — the same beats `toggleBar` already runs.
+Header model/reasoning menus write to **`a.model`** when active, else the global default.
+`PaletteWindowController.storedPosition/setStoredPosition` gain an assistant branch (already branches
+aiBar vs launcher). Switching saves the current session, re-scopes history, and applies the new open
+policy.
 
 ## 8. Hotkeys — per-assistant, UUID-keyed
 
 Mirror the existing per-item pattern (`customCommand`, `quicklink`, `windowLayout`):
 
 - `HotKeyAction.assistant(id: UUID)`; `defaultsKey = "hotkey.assistant.<uuid>"`.
-- `HotKeyManager.boundAssistantIDs` index + `start()` re-registration + prune of bindings whose assistant
-  was deleted (identical to `boundCustomCommandIDs`); added to the `setBinding` index switch,
-  `builtInActions` stays as-is (these are per-item, not fixed).
-- `AppCore` wires `onOpenAssistant = { id in aiChatCoordinator.openAssistant(id:) }`; add `.assistant` to
-  the exhaustive `HotKeyAction` switches (`defaultsKey`, `HotKeyManager.perform`/`displayName`/index,
+- `HotKeyManager.boundAssistantIDs` index + `start()` re-registration + prune of bindings whose
+  assistant was deleted (identical to `boundCustomCommandIDs`); added to the `setBinding` switch,
+  `builtInActions` stays as-is (per-item, not fixed).
+- `AppCore` wires `onOpenAssistant = { id in aiChatCoordinator.openAssistant(id:) }`; add `.assistant`
+  to the exhaustive `HotKeyAction` switches (`defaultsKey`, `HotKeyManager.perform`/`displayName`/index,
   `VisibilityStore.allowsHotKey`, `AppCore.hotKeyDisplayName`).
 
 ## 9. Launcher command per assistant
 
-Each assistant also appears in the launcher as **`Ask <Name>`** (its icon = `a.symbol`/`a.tint`), so it is
-searchable and runnable without a chord. This reuses the dynamic per-item command surface (the same shape
-quicklinks/custom-commands use to appear as launcher rows and to be bindable). Running the row calls
+Each assistant appears in the launcher as **`Ask <Name>`** (icon = `a.symbol`/`a.tint`), searchable and
+runnable without a chord — reusing the per-item command surface. Running the row calls
 `openAssistant(id:)`.
 
 ## 10. History scoping
 
 Additive migration on `ChatHistoryStore`:
 
-- `ALTER TABLE conversations ADD COLUMN assistant_id TEXT;` — existing rows get `NULL` = the default bar,
-  so nothing is lost or reattributed. Guarded so it runs once (check `PRAGMA table_info`).
-- `ChatHistoryStore` gains `var scope: UUID?`. `load()`, `search()` and the resident `conversations` list
-  filter `WHERE assistant_id IS ?` (or `IS NULL` for the default). `save()` stamps the current scope.
-  `prune(before:)` prunes within scope. `conversations_by_recency` index extended to `(assistant_id,
-  updated_at DESC)`.
-- **Ephemeral assistants** skip `save` entirely — the transcript lives only in memory and is dropped on
-  New Chat / close.
-- Switching the active assistant sets `scope` and reloads summaries; the ⌘K Chat History screen then lists
-  only that assistant's chats.
+- `ALTER TABLE conversations ADD COLUMN assistant_id TEXT;` — existing rows get `NULL` = default bar;
+  nothing lost or reattributed. Guarded to run once (checks `PRAGMA table_info`).
+- `ChatHistoryStore` gains `var scope: UUID?`. `load()`/`search()`/the resident `conversations` list
+  filter `WHERE assistant_id IS ?` (or `IS NULL` for default). `save()` stamps the scope. `prune(before:)`
+  prunes within scope. `conversations_by_recency` index extended to `(assistant_id, updated_at DESC)`.
+- **Ephemeral assistants** skip `save` entirely — transcript lives only in memory, dropped on New Chat
+  / close.
+- Switching sets `scope` and reloads summaries; ⌘K Chat History then lists only that assistant's chats.
 
 ## 11. Persistence across sessions
 
@@ -253,37 +233,36 @@ Additive migration on `ChatHistoryStore`:
 | skill library (metadata) | `UserDefaults` `aiSkills` + files under `application-support/skills/` | excluded |
 | transcripts | `ai-chats.sqlite3`, scoped by `assistant_id` | excluded (as today) |
 
-All of AI stays out of settings backups per the existing "no AI setting travels" invariant; every new key
-is added to `SettingsBackupCoverage.deliberatelyExcluded` with a reason (the `settings-backup-test`
-enforces this).
+All of AI stays out of settings backups (the "no AI setting travels" invariant); every new key goes
+into `SettingsBackupCoverage.deliberatelyExcluded` with a reason (`settings-backup-test` enforces this).
 
 ## 12. Settings UI (Settings → AI)
 
 Two new sections plus one editor sheet:
 
-- **Assistants** — a reorderable list: icon + name + shortcut recorder + live status (model, #skills,
-  #MCP). Add / Duplicate / Remove. "Add" seeds a blank assistant; "Duplicate" clones one.
-- **Skills** — a library list like MCP's: name + summary + enabled toggle; **Import Skill…** (folder or
-  `SKILL.md`) and Remove. Parses and shows frontmatter errors inline.
+- **Assistants** — reorderable list: icon, name, shortcut recorder, live status (model, #skills, #MCP);
+  Add / Duplicate / Remove ("Add" seeds blank, "Duplicate" clones).
+- **Skills** — a library list like MCP's: name, summary, enabled toggle; **Import Skill…** (folder or
+  `SKILL.md`) and Remove; shows frontmatter errors inline.
 - **`AssistantEditorSheet`** (modeled on `MCPServerEditor` / `AIConnectionEditorSheet`): name, icon +
   tint picker, `ShortcutRecorder(action: .assistant(id:))`, `SystemPromptEditor`, model picker,
-  web-search toggle, **Skills** checkboxes, **MCP servers** checkboxes, `opens to` / `new chat after`,
-  retention, ephemeral toggle, seed prompt. A footer notes prompt+skills are billed every turn.
+  web-search toggle, **Skills**/**MCP servers** checkboxes, `opens to` / `new chat after`, retention,
+  ephemeral toggle, seed prompt; footer notes prompt+skills are billed every turn.
 
 ## 13. Extras (all in v1)
 
-- **Icon + tint** per assistant — in the bar's leading glyph and the launcher row.
+- **Icon + tint** per assistant — bar's leading glyph and the launcher row.
 - **Ephemeral mode** — no saved history (scratch / sensitive work).
 - **Per-assistant `opens to` / `new chat after`** — fresh vs resume, per persona.
 - **Launcher command** `Ask <Name>` (§9).
-- **Per-assistant width/size** — the panel may open at `a.width`; `PaletteWindowController` reads it
-  instead of the fixed `panelWidth` when an assistant is active. Position + width = "size remembered".
+- **Per-assistant width/size** — panel may open at `a.width`; `PaletteWindowController` reads it
+  instead of the fixed `panelWidth` when active. Position + width = "size remembered".
 - **Seed/example prompt** — shown in the empty-state under "Ask anything…".
 
 ## 14. Invariants (new)
 
 - **The default bar is untouched.** With `activeAssistant == nil`, every send-path input, placement key
-  and history query is byte-for-byte today's behaviour. This is the regression firewall.
+  and history query is byte-for-byte today's behaviour — the regression firewall.
 - **Assistants, Skills and every new key are backup-excluded**, like all AI state — an import can never
   arm an assistant, a skill (instruction content) or a tool set it cannot configure.
 - **Skills contribute instructions by default; execution is opt-in per assistant.** A bundled script
@@ -291,8 +270,8 @@ Two new sections plus one editor sheet:
   route/setting stays instructions-only, with no execution surface. MCP tools remain API-routes-only.
 - **`assistant_id` is additive and NULL-preserving.** The migration never rewrites an existing chat's
   attribution; NULL is the default bar forever.
-- **One `AIChatState`, re-pointed.** Only one assistant is live at a time; switching saves then re-scopes.
-  No second actor, no second chat state.
+- **One `AIChatState`, re-pointed.** Only one assistant is live at a time; switching saves then
+  re-scopes. No second actor, no second chat state.
 - **`Model/` stays Foundation-only** — `Assistant`, `Skill`, `SkillFrontmatter`, `AssistantOpenPolicy`
   and the skills budget are pure and harness-pinned (`assistant-test`, extending `ai-chat-test`).
 
@@ -306,7 +285,7 @@ Two new sections plus one editor sheet:
 4. **Active-assistant routing** — `AppCore.activeAssistant`, `openAssistant`, `AIChatCoordinator` model/
    prompt/tools/webSearch/open-policy branches, header menus write to the assistant, placement/width.
    **Highest risk** — the send path; the `activeAssistant == nil` firewall + `ai-chat-test` guard it.
-5. **History scoping** — `assistant_id` migration + `scope`, ephemeral skip. *Medium (SQLite).* 
+5. **History scoping** — `assistant_id` migration + `scope`, ephemeral skip. *Medium (SQLite).*
 6. **Settings UI** — Assistants list, Skills library, `AssistantEditorSheet`.
 7. **Launcher command + icon/tint + width/size + seed prompt** — the remaining extras.
 8–9. **Plugin assistants** (custom SwiftUI UI + behaviour) — a later track that builds on 1–7 and the
@@ -361,19 +340,19 @@ Features/Plugins/UI/PluginCoordinator.swift   host AssistantSessionBridge + rend
 
 ## 18. Open items / future
 
-- **Progressive disclosure** for skills (inject name+description; model pulls the body via a tool) — more
-  faithful to Anthropic's model, needs tool support, API-routes-only.
+- **Progressive disclosure** for skills (inject name+description; model pulls the body via a tool) —
+  more faithful to Anthropic's model, needs tool support, API-routes-only.
 - **Native skill execution** on the Claude/OpenCode CLIs (if a sandbox-safe path exists).
-- **Sharing/exporting** an assistant (its config minus credentials) — deliberately not a backup, so a
+- **Sharing/exporting** an assistant (config minus credentials) — deliberately not a backup, so a
   separate explicit export.
 
 ## 19. Pluggable Assistants (Swift plugins)
 
 An Assistant can be **provided by a native Swift plugin** instead of configured: the plugin renders its
-own SwiftUI chat UI and adds custom behaviour, and the host registers it as a chat bar with a shortcut,
-placement, history slot and everything a configured assistant has. This reuses the existing native plugin
-system ([plugins.md](docs/features/plugins.md), a fork feature) — a prebuilt, trusted, in-process `.dylib`
-that links `TinycastPluginKit.framework`.
+own SwiftUI chat UI and custom behaviour, and the host registers it as a chat bar with a shortcut,
+placement, history slot and everything a configured assistant has. Reuses the existing native plugin
+system ([plugins.md](plugins.md), a fork feature) — a prebuilt, trusted, in-process `.dylib` that links
+`TinycastPluginKit.framework`.
 
 ### 19.1 The contract (additions to `TinycastPluginKit`)
 
@@ -398,13 +377,13 @@ public struct AssistantDescriptor: Sendable, Equatable {
 }
 ```
 
-`AssistantDescriptor`s are read the moment the dylib loads (like `PluginMetadata`), so the host lists the
-assistant before paying for the code behind it.
+`AssistantDescriptor`s are read the moment the dylib loads (like `PluginMetadata`).
 
 ### 19.2 The AI bridge — `AssistantSession`
 
 A plugin never reaches into `AIChatState` or the provider layer. The host implements `AssistantSession`
-and passes a live one into the surface; the plugin drives the model through it and observes the transcript:
+and passes a live one into the surface; the plugin drives the model through it and observes the
+transcript:
 
 ```swift
 @MainActor @Observable
@@ -432,44 +411,44 @@ public struct AssistantTool: Sendable {
 }
 ```
 
-- The host backs the session with the same `AIChatState` + `AIChatCoordinator`, scoped to this assistant
-  (its model, history, retention). `send(_:instructions:tools:)` layers the plugin's tools onto the
-  existing `AIToolLoopProvider` and overrides the composed instructions for that turn.
-- A plugin wanting a fully bespoke experience can ignore `send` and render anything — being an assistant
-  just grants a chat-bar summon (shortcut, placement, history slot). It is trusted native code, so it may
-  also call APIs, show widgets and keep its own state.
-- The contract is the **framework, one copy**, exactly like `TinycastPlugin`: `AssistantSession` and its
-  value types are the same types across the `dlopen` boundary, so the bridge never mismatches.
+- The host backs the session with the same `AIChatState` + `AIChatCoordinator`, scoped to this
+  assistant (model, history, retention). `send(_:instructions:tools:)` layers the plugin's tools onto
+  the existing `AIToolLoopProvider` and overrides the composed instructions for that turn.
+- A plugin wanting a fully bespoke experience can ignore `send` and render anything — being an
+  assistant just grants a chat-bar summon (shortcut, placement, history slot). It's trusted native
+  code: it may also call APIs, show widgets and keep its own state. The contract is the framework, one
+  copy, like `TinycastPlugin` (§19.6): `AssistantSession`'s types are the same across the `dlopen`
+  boundary.
 
 ### 19.3 Discovery, registration, rendering
 
-- `PluginManager` already loads dylibs; on load it also checks `plugin as? AssistantPlugin` and reads its
-  `assistants`. For each descriptor the host **materialises an `Assistant`** with
+- `PluginManager` already loads dylibs; on load it also checks `plugin as? AssistantPlugin` and reads
+  its `assistants`. For each descriptor the host **materialises an `Assistant`** with
   `provider = .plugin(pluginID:, descriptorID:)`, seeded from the descriptor — a first-class, persisted
   Assistant with its own shortcut, placement, width, history scope and retention. Removing the plugin
   greys its assistants (kept, restorable) rather than dropping their config.
 - Summoning a plugin assistant enters the assistant palette mode, but the body renders the plugin's
-  `assistantSurface(id:session:context:)` — hosted like the existing `.surface` path (the plugin owns the
-  panel; it may wrap in `PluginScaffold` or draw bare). The host builds the `AssistantSession` from the
-  scoped `AIChatState`/coordinator and injects it. Placement, growth direction and width come from the
-  `Assistant` config exactly as for a configured one.
-- The **Assistants settings list** shows both kinds; a plugin assistant is badged "provided by <plugin>",
-  its plugin-owned fields read-only, its host fields (shortcut, placement, model where allowed, retention,
-  ephemeral) editable.
+  `assistantSurface(id:session:context:)` — hosted like the existing `.surface` path (the plugin owns
+  the panel; it may wrap in `PluginScaffold` or draw bare). The host builds the `AssistantSession` from
+  the scoped `AIChatState`/coordinator and injects it. Placement, growth direction and width come from
+  the `Assistant` config, as for a configured one.
+- The **Assistants settings list** shows both kinds; a plugin assistant is badged "provided by
+  <plugin>", its plugin-owned fields read-only, its host fields (shortcut, placement, model where
+  allowed, retention, ephemeral) editable.
 
 ### 19.4 Model & routing
 
 - `Assistant.provider: AssistantProvider = .configured | .plugin(pluginID: String, descriptorID: String)`.
 - The palette body chooses the surface: `.plugin` → the plugin surface, `.configured` → the standard
-  `AIScreen`. Everything else (hotkey, history scope, placement/width, retention, ephemeral) is identical,
-  so a plugin assistant reuses the whole assistant machinery.
+  `AIScreen`. Everything else (hotkey, history scope, placement/width, retention, ephemeral) is
+  identical, so a plugin assistant reuses the whole assistant machinery.
 
 ### 19.5 Security & consent
 
 A plugin assistant is native code in Tinycast's process — unsandboxed, full privileges, the existing
 plugin trust model. It needs **both** `aiEnabled` and `pluginsEnabled` (which already confirms before
-turning on, carries the library-validation entitlement, and is backup-excluded). No plugin, assistant or
-otherwise, is ever armed by importing a backup.
+turning on, carries the library-validation entitlement, and is backup-excluded). No plugin or
+assistant is ever armed by importing a backup.
 
 ### 19.6 Invariants (plugin assistants)
 
@@ -483,12 +462,13 @@ otherwise, is ever armed by importing a backup.
 
 ### 19.7 Phasing
 
-Plugin assistants land **after** configured assistants (phases 1–7), because they build on the assistant
-machinery and the plugin system:
+Plugin assistants land **after** configured assistants (phases 1–7), because they build on the
+assistant machinery and the plugin system:
 
-- **Phase 8 — contract:** `AssistantPlugin`, `AssistantDescriptor`, `AssistantSession`, `AssistantMessage`,
-  `AssistantModel`, `AssistantTool` in `TinycastPluginKit`; a host `AssistantSessionBridge` implementing
-  the protocol over `AIChatState`/`AIChatCoordinator`; a sample assistant plugin in `tinycast_addons`.
-- **Phase 9 — host integration:** `PluginManager` discovery, `AssistantStore` materialising plugin-backed
-  `Assistant`s, the palette rendering the plugin surface, and the settings "provided by <plugin>" badge and
-  read-only handling.
+- **Phase 8 — contract:** `AssistantPlugin`, `AssistantDescriptor`, `AssistantSession`,
+  `AssistantMessage`, `AssistantModel`, `AssistantTool` in `TinycastPluginKit`; a host
+  `AssistantSessionBridge` implementing the protocol over `AIChatState`/`AIChatCoordinator`; a sample
+  assistant plugin in `tinycast_addons`.
+- **Phase 9 — host integration:** `PluginManager` discovery, `AssistantStore` materialising
+  plugin-backed `Assistant`s, the palette rendering the plugin surface, and the settings "provided by
+  <plugin>" badge and read-only handling.

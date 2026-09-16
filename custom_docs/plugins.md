@@ -1,11 +1,18 @@
 # Native plugins
 
 Tinycast loads **native Swift plugins** — compiled dynamic libraries that render into the command
-palette with SwiftUI. This is separate from [extensions](extensions.md), which run Raycast's
-JavaScript in JavaScriptCore. A plugin is first-party Swift the user builds and trusts; it runs
-**in-process, unsandboxed, with the app's full privileges**.
+palette with SwiftUI. This is separate from [extensions](../docs/features/extensions.md), which run
+Raycast's JavaScript in JavaScriptCore. A plugin is first-party Swift the user builds and trusts.
 
-> This is a fork-local feature. See [CUSTOM.md](../../CUSTOM.md) for how it is carried and where
+**Trust model.** A plugin runs **in-process, unsandboxed, with the app's full privileges**
+(Accessibility, Automation, the lot) — the same trust model BetterTouchTool states for its Swift
+plugins. Only install plugins whose source you have read. Because of that: `pluginsEnabled`
+defaults off, confirms before it turns on, and never rides a settings backup (importing one can
+never silently arm plugin loading); the app ships the
+`com.apple.security.cs.disable-library-validation` entitlement so a user-built, ad-hoc-signed dylib
+can load under the hardened runtime.
+
+> This is a fork-local feature. See [CUSTOM.md](CUSTOM.md) for how it is carried and where
 > plugin sources live.
 
 ## Invariants
@@ -21,10 +28,6 @@ JavaScript in JavaScriptCore. A plugin is first-party Swift the user builds and 
 - **A plugin surfaces as exactly one launcher row** (`AppEntry.Kind.plugin`). Activating it enters
   `PaletteMode.plugin`, where the plugin owns the whole screen. Its own rows, children and surfaces
   live inside that mode — they never leak into the root launcher index.
-- **Loading needs consent and an entitlement.** `pluginsEnabled` defaults off, confirms before it
-  turns on, and never rides a settings backup. The app ships
-  `com.apple.security.cs.disable-library-validation` so a user-built dylib can load under the
-  hardened runtime.
 - **The API layer may use SwiftUI.** `TinycastPluginKit` is not under `Features/*/Model/`, so the
   purity rule does not apply — `PluginResult`/`PluginContext` are still Foundation-only value types,
   but the contract vends `AnyView`.
@@ -50,9 +53,10 @@ JavaScript in JavaScriptCore. A plugin is first-party Swift the user builds and 
 
 Files: `TinycastPluginKit/` (the framework), `Tinycast/Features/Plugins/` (the host feature).
 
-Installed plugins live at `~/Library/Application Support/<bundle id>/plugins/<name>/`, each a folder
-with a `manifest.json` and the dylib it names. The bundle id is per channel, so `Tinycast Dev.app`
-(`com.tinycast.app.dev`) never shares plugins with a release build.
+Installed plugins live at `~/Library/Application Support/<bundle id>/plugins/<name>/`, each a
+folder with a `manifest.json` and the dylib it names. The bundle id is per channel — `Tinycast
+Dev.app` is `com.tinycast.app.dev`, a release build is `com.tinycast.app` — so a dev build never
+shares plugins with a release build.
 
 ## The plugin contract
 
@@ -121,12 +125,44 @@ and JS extensions render (the app builds it in `RootPaletteView.bottomBar` with 
 — give scroll views `.contentMargins(.bottom, …)` so the last row clears it.
 
 The full authoring guide — focus/layout gotchas and a worked example — lives beside the plugins:
-`tinycast_addons/extensions/SWIFT_PLUGINS.md`.
+`tinycast_addons/extensions/SWIFT_PLUGINS.md`. The worked row-model example is
+[`hello-plugin`](../../tinycast_addons/extensions/hello-plugin/) — a run action, a drill-in child
+list, a SwiftUI surface and an external link, all in one plugin. The worked surface-only example is
+[`stock-quotes-plugin`](../../tinycast_addons/extensions/stock-quotes-plugin/).
 
-## Writing a plugin
+## Build a plugin
 
-The worked example is [`hello-plugin`](../../../tinycast_addons/extensions/hello-plugin/) — it shows
-a run action, a drill-in child list, a SwiftUI surface and an external link. The shape:
+Compile against the **build-products** `TinycastPluginKit.framework`, not the copy embedded in the
+app — Xcode strips its Swift `Modules/` on embed. Build Tinycast once to produce a compilable copy:
+
+```sh
+cd ~/Developer/tinycast
+xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Debug \
+    -derivedDataPath build/DerivedData build
+```
+
+| | Path |
+|---|---|
+| Framework to compile against | `build/DerivedData/Build/Products/Debug/TinycastPluginKit.framework` |
+| The app to load into | `build/DerivedData/Build/Products/Debug/Tinycast Dev.app` (`com.tinycast.app.dev`) |
+
+Verify the framework carries its module (the thing that trips people up) — if this path is
+missing, you're looking at a stripped copy; rebuild Tinycast:
+
+```sh
+ls "$HOME/Developer/tinycast/build/DerivedData/Build/Products/Debug/TinycastPluginKit.framework/Versions/A/Modules/TinycastPluginKit.swiftmodule"
+```
+
+**Folder layout** (anywhere; the shipped samples live in `tinycast_addons/extensions/`):
+
+```
+my-plugin/
+├── Sources/MyPlugin/MyPlugin.swift
+├── manifest.json
+└── build.sh
+```
+
+**A minimal plugin** — a surface-only shape (`Sources/MyPlugin/MyPlugin.swift`):
 
 ```swift
 import AppKit
@@ -134,57 +170,105 @@ import SwiftUI
 import TinycastPluginKit
 
 final class MyPlugin: NSObject, TinycastPlugin {
-    static let metadata = PluginMetadata(name: "My Plugin", subtitle: "…", icon: "star")
+    static let metadata = PluginMetadata(name: "My Plugin", subtitle: "A native SwiftUI plugin", icon: "star")
 
     // NSObject's init() does not satisfy the protocol requirement on its own — declare it.
     override init() { super.init() }
 
-    func results(for context: PluginContext) -> [PluginResult] {
-        [PluginResult(id: "hi", title: "Say Hi", action: .run(id: "hi"))]
-            .filter { context.query.isEmpty || $0.title.localizedCaseInsensitiveContains(context.query) }
-    }
-
-    func perform(resultID: String, context: PluginContext) async -> PluginActionResult {
-        .init(closesLauncher: true, message: "Hi!")
+    // Return a view to open straight into a full-panel SwiftUI surface.
+    func rootSurface(context: PluginContext) -> AnyView? {
+        AnyView(RootView())
     }
 }
 
-// Every plugin exports exactly this symbol; it is the host's only entry point.
+private struct RootView: View {
+    @State private var navigator = PluginNavigator()
+
+    var body: some View {
+        // PluginScaffold gives you the shared footer, Escape-to-back, a ⌘K palette
+        // and focus-independent list navigation. A surface owns the whole panel.
+        PluginScaffold(navigator: navigator, primaryActionLabel: "") {
+            Text("Hello from a native plugin")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+// The host's only entry point — export exactly this symbol, verbatim.
 @_cdecl("tinycastPluginCreate")
 public func tinycastPluginCreate() -> UnsafeMutableRawPointer {
     TinycastPluginRuntime.export { MyPlugin() }
 }
 ```
 
-### Build, install, run
+For the row-model shape instead, implement `results(for:)` and `perform(resultID:context:)` per
+the contract above — see `hello-plugin`.
 
-Plugins are built with one `swiftc` line, wrapped in a `build.sh`
-([see the sample's](../../../tinycast_addons/extensions/hello-plugin/build.sh)):
-
-```sh
-swiftc -emit-library -O -module-name MyPlugin \
-  -F "<framework-dir>" -framework TinycastPluginKit \
-  -Xlinker -rpath -Xlinker "@executable_path/../Frameworks" \
-  -o build/libMyPlugin.dylib Sources/MyPlugin/*.swift
-codesign --force --sign - build/libMyPlugin.dylib
-```
-
-Two subtleties the sample handles for you:
-
-- **Compile against a framework that still has its `Modules/`.** Xcode strips the Swift module from
-  the copy embedded in the `.app`, so compile against the **build-products** framework
-  (`…/DerivedData/Build/Products/Debug/TinycastPluginKit.framework`), not the one inside the app.
-- **`@executable_path/../Frameworks` is the runtime rpath.** In a `dlopen`ed dylib, `@executable_path`
-  is the *host* (Tinycast) executable, so this resolves the plugin's `@rpath` framework dependency to
-  the already-loaded framework inside the app.
-
-Then drop `manifest.json` + the dylib into
-`~/Library/Application Support/<bundle id>/plugins/<name>/` (the sample's `./build.sh install` does
-this), enable plugins in **Settings → Plugins**, and search for the plugin by name.
+**The manifest** (`manifest.json`) — the launcher row's identity and the dylib it loads:
 
 ```json
-{ "name": "My Plugin", "identifier": "com.example.my", "icon": "star", "dylib": "libMyPlugin.dylib" }
+{
+  "name": "My Plugin",
+  "identifier": "com.example.my",
+  "subtitle": "A native SwiftUI plugin",
+  "icon": "star",
+  "dylib": "libMyPlugin.dylib"
+}
 ```
+
+`icon` is an SF Symbol name; `dylib` must match the file `build.sh` produces.
+
+**The build script.** One `swiftc` line, wrapped in a `build.sh`
+([see the sample's](../../tinycast_addons/extensions/hello-plugin/build.sh)). Two subtleties it
+handles:
+
+- **`-F` points at the build-products framework** (the one with `Modules/`), never the app's copy.
+- **`-rpath @executable_path/../Frameworks`** — in a `dlopen`ed dylib, `@executable_path` is the
+  *host* (Tinycast) executable, so this resolves the plugin's `@rpath` framework dependency to the
+  framework already loaded inside the app. No second copy is loaded.
+
+```sh
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")"
+
+NAME="MyPlugin"
+DYLIB="libMyPlugin.dylib"
+APP="${TINYCAST_APP:-$HOME/Developer/tinycast/build/DerivedData/Build/Products/Debug/Tinycast Dev.app}"
+FW="${TINYCAST_FRAMEWORKS:-$HOME/Developer/tinycast/build/DerivedData/Build/Products/Debug}"
+
+mkdir -p build
+swiftc -emit-library -O \
+  -module-name "$NAME" \
+  -F "$FW" -framework TinycastPluginKit \
+  -Xlinker -rpath -Xlinker "@executable_path/../Frameworks" \
+  -o "build/$DYLIB" \
+  Sources/MyPlugin/*.swift
+
+# Ad-hoc sign so the hardened runtime will load it (the host disables library validation).
+codesign --force --sign - "build/$DYLIB"
+echo "built build/$DYLIB"
+
+if [[ "${1:-}" == "install" ]]; then
+  BID="$(defaults read "$APP/Contents/Info" CFBundleIdentifier)"
+  DEST="$HOME/Library/Application Support/$BID/plugins/my-plugin"
+  mkdir -p "$DEST"
+  cp "build/$DYLIB" manifest.json "$DEST/"
+  echo "installed to $DEST"
+fi
+```
+
+**Build, install, enable, run:**
+
+```sh
+chmod +x build.sh
+./build.sh            # -> build/libMyPlugin.dylib, ad-hoc signed
+./build.sh install    # copies dylib + manifest.json into the per-channel plugins folder
+```
+
+Open Tinycast → **Settings → Plugins** and turn plugins on (it confirms the first time — plugins
+are unsandboxed native code), then summon the palette and search for the plugin by name.
+Activating its row enters the plugin's own mode, where it owns the whole screen.
 
 ## Installing while Tinycast runs
 
@@ -194,8 +278,9 @@ within a moment, no relaunch needed. The rescan is debounced, so a burst of file
 install collapses into a single refresh.
 
 The one case a restart is still required: **updating a plugin that is already loaded.** Once a
-plugin has been launched this session its dylib is mapped, and `dlopen` reference-counts — rebuilding
-the same path won't replace the running image. Quit and reopen Tinycast to pick up a rebuilt dylib.
+plugin has been launched this session its dylib is mapped, and `dlopen` reference-counts —
+rebuilding the same path won't replace the running image. Quit and reopen Tinycast to pick up a
+rebuilt dylib.
 
 ## Pop-out windows
 
@@ -223,10 +308,12 @@ func rootSurface(context: PluginContext) -> AnyView? {
 `.window` needs a `PluginRoute` (the scaffold's `route:` closure), which both identifies the window
 and restores its content; a surface with no route offers no Pop Out.
 
-## Security
+## Troubleshooting
 
-A plugin is native code loaded into Tinycast's process: it inherits every permission Tinycast holds
-(Accessibility, Automation) and is not sandboxed — the same trust model BetterTouchTool states for
-its Swift plugins. `pluginsEnabled` therefore confirms before turning on and is excluded from
-settings backups, so importing a backup can never silently arm plugin loading. Only install plugins
-whose source you have read.
+| Symptom | Cause & fix |
+|---|---|
+| `swiftc` error: no such module `TinycastPluginKit` | `-F` points at the stripped app copy. Point it at the build-products `TinycastPluginKit.framework` (the one with `Modules/`), or rebuild Tinycast. |
+| Plugin row never appears | Plugins disabled (Settings → Plugins), or `manifest.json`/dylib not in `…/Application Support/<bundle id>/plugins/<name>/`, or `dylib` in the manifest doesn't match the built filename. |
+| Loads but casts fail / crashes at launch | A vendored/duplicate `TinycastPluginKit` was linked. There must be exactly one framework across the `dlopen` boundary — always the build-products copy. |
+| Rebuild has no effect | The old dylib is still mapped. Quit and reopen Tinycast (see above). |
+| Won't load under the hardened runtime | The dylib isn't signed. `codesign --force --sign - build/libMyPlugin.dylib` (the build script does this). |

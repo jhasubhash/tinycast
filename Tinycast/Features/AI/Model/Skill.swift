@@ -3,7 +3,7 @@ import Foundation
 /// A Claude Agent Skill: a name, a "when to use" summary, and instruction text an assistant injects into
 /// a turn. Pure and `Codable`; `SkillStore` imports it from a `SKILL.md` and persists the parsed result.
 /// The instructions always ride along; a bundled script runs only when the assistant has shell tools on
-/// (see `Assistant_Architecture.md` §6.3).
+/// (see `custom_docs/Assistant_Architecture.md` §6.3).
 struct Skill: Identifiable, Codable, Sendable, Equatable {
     let id: UUID
     var name: String
