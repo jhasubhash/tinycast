@@ -40,14 +40,6 @@ final class PalettePanel: NSPanel {
         fieldEditor?.selectAll(nil)
     }
 
-    /// Insert text at the field editor's caret — the AI composer's Shift+↵ line break.
-    @discardableResult
-    func insertIntoField(_ text: String) -> Bool {
-        guard let editor = fieldEditor else { return false }
-        editor.insertText(text, replacementRange: editor.selectedRange())
-        return true
-    }
-
     /// Nil while a selection can still collapse normally, or when the caret is not at an edge.
     private func headerFieldBoundary(for event: NSEvent) -> HeaderFieldBoundary? {
         guard event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
