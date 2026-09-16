@@ -7,6 +7,10 @@ DerivedData/
 *.xcuserdatad/
 *.xcuserstate
 
+# Machine-local signing override (personal Apple identity); the committed
+# Signing.xcconfig optionally includes it. Never commit this.
+Signing.local.xcconfig
+
 # User-specific project settings
 *.pbxuser
 !default.pbxuser
@@ -57,6 +61,10 @@ node_modules/
 *.swp
 *.tmp
 *.orig
+
+# Local scratch task list, never shared.
+todo.md
+
 # Website (Next.js). `out/` is the static export, `.source/` is generated from
 # content/docs by fumadocs-mdx on install and build.
 website/.next/

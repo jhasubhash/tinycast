@@ -147,14 +147,29 @@ osascript -e 'quit app "Tinycast Dev"'
 open "build/DerivedData/Build/Products/Debug/Tinycast Dev.app"
 ```
 
-Keeping the `Tinycast Self-Signed` identity is what makes macOS remember the Accessibility grant across
-rebuilds. Do not let a build fall back to ad-hoc signing — the grant is then re-requested every time.
+Debug signs with your **Developer ID Application** identity, not `Tinycast Self-Signed` — but that
+identity is never committed. `Signing.xcconfig` is the project's Debug base config: it sets the
+portable `Tinycast Self-Signed` default and ends with `#include? "Signing.local.xcconfig"`. That local
+file is gitignored and holds your `Developer ID Application: … (KX3L7SJ2KL)` and team, overriding the
+default at build time. A clone without it — CI, or anyone else — builds `Tinycast Self-Signed` and is
+unaffected; to sign Debug with your own Apple identity on a new machine, create `Signing.local.xcconfig`
+(two keys, see the committed `Signing.xcconfig` header). Release pins `Tinycast Self-Signed` in
+`project.yml` (`configs.Release`), above the include, so a local override never reaches a release.
+
+Why Developer ID for Debug at all: macOS remembers the Accessibility (TCC) grant across rebuilds under
+either identity — TCC matches by designated requirement — but the login-Keychain "Always Allow" grant
+(the AI API keys, MCP and `assistant-environment` secrets) is different: its per-item ACL silently
+re-authorizes a rebuilt binary *only when the code-sign anchor is a trusted Apple one*. The self-signed
+anchor is `CSSMERR_TP_NOT_TRUSTED`, so the Keychain reprompted on every rebuild (and would on every
+self-signed release update too). The Developer ID DR is team-pinned (`subject.OU = KX3L7SJ2KL`), so it
+survives both a rebuild and a cert renewal. Switching identity resets both grants **once** on the next
+launch, then they stick. Do not let a build fall back to ad-hoc signing — that reprompts every time.
 
 Verify a build actually got signed with it:
 
 ```sh
 codesign -dvv "build/DerivedData/Build/Products/Debug/Tinycast Dev.app" 2>&1 | grep Authority
-# Authority=Tinycast Self-Signed
+# Authority=Developer ID Application: Subhash Jha (KX3L7SJ2KL)
 ```
 
 ## Extensions live outside this repo
@@ -238,3 +253,5 @@ link are the fork's own scaffolding and are not listed. `git log main..custom` i
 | Keep the floating AI Chat bar open on focus loss | `Features/Settings/{AppSettings,AppSettingsKey}.swift`, `Palette/PaletteWindowController.swift`, `Features/AI/Settings/AISettingsView.swift`, `Features/Backup/Model/SettingsBackupCoverage.swift` | A **Keep the floating bar open** toggle (Settings → AI → Chat, off by default) makes `AppSettings.aiBarStaysOpen` skip the resign-key auto-hide in `PaletteWindowController.windowDidResignKey` when the floating AI bar (`palette.aiBar`) is up, so it survives clicking into another app instead of closing on blur. Every other surface still hides normally, and the bar still closes on Escape / New Chat / re-summon. Backup-excluded as a per-Mac UI behaviour. | Yes |
 | Stream the model's reasoning into chat (togglable) | `Features/AI/Model/{AIRequest,AIStreamDecoder,InstalledAIStream,ChatMessage,Assistant}.swift`, `Features/AI/Service/CodexTurnRunner.swift`, `Features/AI/UI/{AIChatState,AIScreen,ChatTranscriptView,ChatHistoryView}.swift`, `Features/AI/Settings/{AISettingsStore,AISettingsView,AssistantEditorSheet}.swift`, `Features/Settings/AppSettingsKey.swift`, `Features/Backup/Model/SettingsBackupCoverage.swift`, `Tests/ai-provider-test.swift` | `AIStreamEvent.thinking` now carries the reasoning text (was a bare signal that discarded it, so a reasoning model looked hung behind a lone spinner). Every decoder extracts it — API/OpenRouter (`delta.reasoning`/`reasoning_details[].text`), Anthropic + Claude CLI (`thinking_delta.thinking`) — and `AIChatState` accumulates it into `ChatMessage.reasoning` (live, not persisted). A collapsible "Thinking…" block streams it open above the answer, then folds when the answer begins. Gated by a global `AISettingsStore.showReasoning` (Settings → AI → Chat, on by default) with a per-assistant override (`Assistant.showReasoning`, editor's Model section), resolved `activeAssistant?.showReasoning ?? global`; backup-excluded as a per-Mac display choice. The empty streaming bubble now always labels itself "Thinking…". Note: reasoning **text** only exists on API-key routes — the CLI tools redact it (Claude `-p` sends `thinking:""`+signature) or omit it (Copilot streams only `reasoning_tokens` counts). | Yes |
 | Reasoning-effort picker for Copilot models | `Features/AI/Model/InstalledAI.swift` | `copilotCatalog` now builds every Copilot model with the shared `cliEfforts` ladder (`low/medium/high/xhigh/max`) — the exact set Copilot advertises (`reasoning_effort` in its JSONL) and the Claude CLI already used. So the header's effort picker appears for Copilot (defaulting to High) exactly as it does for Claude; `InstalledCLIProvider` already passed `--reasoning-effort` for the copilot route, so the choice now reaches `copilot -p`. | With plugins |
+| Debug signs with a real Developer ID identity, via a gitignored local xcconfig | `Signing.xcconfig` (new — project Debug base config), `Signing.local.xcconfig` (new — gitignored), `project.yml`, `.gitignore`, `Tinycast.xcodeproj` | The login-Keychain "Always Allow" grant (AI keys, MCP, `assistant-environment`) only survives a rebuild when the app's code-sign anchor is Apple-trusted; `Tinycast Self-Signed` is `CSSMERR_TP_NOT_TRUSTED`, so the Keychain reprompted on every rebuild while TCC — matching by DR — did not. Debug now signs with `Developer ID Application: … (KX3L7SJ2KL)`, a team-pinned DR stable across rebuilds and cert renewal. The identity is **not** committed: `Signing.xcconfig` carries the portable `Tinycast Self-Signed` default and `#include?`s the gitignored `Signing.local.xcconfig` that holds the personal identity, so any clone (and CI) builds self-signed and unaffected. Release pins self-signed in `configs.Release`. | Mechanism yes; identity machine-local |
+| Floating AI Chat composer clears the inline model/effort controls | `Palette/RootPaletteView.swift` | The AI composer fills the header row (`maxWidth: .infinity`) while the model + reasoning buttons sit inline to its right, separated only by the `spacing.md` inter-control gutter. Since the composer's text runs to its frame edge, a full wrapped line ended ~8pt from "Claude Sonnet" — crowding it and forcing a mid-word wrap. Widened that one gutter to `spacing.xxl` so the composer keeps clear word-boundary clearance from the controls; every other single-line header field is unaffected. | Yes |
