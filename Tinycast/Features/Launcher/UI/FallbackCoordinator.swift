@@ -22,9 +22,16 @@ final class FallbackCoordinator {
     /// The launcher's rows. An empty query is nobody's input, so it earns no section at all.
     func entries(for query: String) -> [(fallback: Fallback, entry: AppEntry)] {
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
-        return available.filter(store.isEnabled).compactMap { fallback in
-            entry(for: fallback).map { (fallback, $0) }
+        let rows = available.filter(store.isEnabled).compactMap { fallback in
+            entry(for: fallback).map { (fallback: fallback, entry: $0) }
         }
+        // A reminder-intent phrase floats scheduling to the top so ↵ lands on it, order untouched.
+        guard ReminderPhraseParser.signalsIntent(in: query),
+              let index = rows.firstIndex(where: { $0.fallback == .builtin(.scheduleReminder) })
+        else { return rows }
+        var promoted = rows
+        promoted.insert(promoted.remove(at: index), at: 0)
+        return promoted
     }
 
     /// Nil for a quicklink deleted since the order was stored.

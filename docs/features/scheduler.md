@@ -129,6 +129,11 @@ is unavailable or its answer is unusable, so an unparseable phrase surfaces "Cou
 …" rather than a guess. Unlike the AI-chat tool, this fallback needs no tool-capable model — the
 deterministic parser is the whole path on most Macs.
 
+When the typed phrase reads as a reminder request — `ReminderPhraseParser.signalsIntent(in:)` matches a
+keyword like "remind me" or "notify me", before any time is even typed — `FallbackCoordinator.entries`
+floats this row to the top of the fallback list so ↵ lands on scheduling. It is a per-query reorder of
+the displayed rows only; the stored fallback order is untouched.
+
 ## Settings and backup
 
 `schedulerEnabled` and `schedulerShowInLauncher` live in `AppSettings`/`AppSettingsKey`.
