@@ -39,10 +39,10 @@ final class PluginWindowController: NSObject, NSWindowDelegate {
 
     /// Opens `install`'s current view as a standalone window, restoring it through `route`. A window
     /// already showing this exact route is raised instead of duplicated.
-    func open(install: PluginInstall, route: PluginRoute) {
+    func open(install: PluginInstall, route: PluginRoute, activating: Bool = true) {
         let key = PluginRouteURL.encode(identifier: install.manifest.identifier, payload: route.payload)
         if let existing = windows[key] {
-            existing.panel.makeKeyAndOrderFront(nil)
+            if activating { existing.panel.makeKeyAndOrderFront(nil) }
             existing.panel.orderFrontRegardless()
             return
         }
@@ -91,7 +91,7 @@ final class PluginWindowController: NSObject, NSWindowDelegate {
         }
 
         windows[key] = Entry(panel: panel, plugin: plugin)
-        panel.makeKeyAndOrderFront(nil)
+        if activating { panel.makeKeyAndOrderFront(nil) }
         panel.orderFrontRegardless()
         persist()
     }
@@ -116,7 +116,7 @@ final class PluginWindowController: NSObject, NSWindowDelegate {
             guard let route = PluginRouteURL.decode(saved.route),
                 let install = core.plugins.install(forIdentifier: route.identifier)
             else { continue }
-            open(install: install, route: PluginRoute(payload: route.payload, title: ""))
+            open(install: install, route: PluginRoute(payload: route.payload, title: ""), activating: false)
             if saved.allSpaces { setShowsOnAllSpaces(true, key: saved.route) }
             if saved.keepInFront { setKeepsInFront(true, key: saved.route) }
         }

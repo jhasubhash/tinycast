@@ -95,7 +95,7 @@ final class AIChatWindowController: NSObject, NSWindowDelegate {
             let entry = makeEntry(scope: scope, key: saved.scope)
             entry.coordinator.restore(to: scope)
             windows[saved.scope] = entry
-            entry.panel.makeKeyAndOrderFront(nil)
+            // Restore without stealing key: makeKey would activate Tinycast and pull focus at launch.
             entry.panel.orderFrontRegardless()
             if saved.allSpaces { setShowsOnAllSpaces(true, key: saved.scope) }
             if saved.keepInFront { setKeepsInFront(true, key: saved.scope) }

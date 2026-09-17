@@ -42,7 +42,7 @@ private func visibleCommands(_ all: [PopOutWindowCommand], _ query: String) -> [
     return all.filter { $0.title.lowercased().contains(needle) }
 }
 
-/// A borderless, non-activating floating panel that hosts one SwiftUI view as its own standalone
+/// A borderless floating panel that hosts one SwiftUI view as its own standalone
 /// window. It carries no palette header, footer or drag strip — the only host chrome is a ⌘K command
 /// palette pinned bottom-right, in the app's own actions-menu shape, for the window's controls. The
 /// user moves it by dragging its background, resizes it from any edge, and opens the menu with ⌘K.
@@ -54,10 +54,11 @@ final class PopOutWindowPanel: NSPanel {
     var commandMenu: PopOutWindowMenu?
     var commandsProvider: (() -> [PopOutWindowCommand])?
 
+    // Not nonactivating: it yields key when Tinycast deactivates, so the displaced app refocuses.
     init(content: NSView, size: CGSize) {
         super.init(
             contentRect: NSRect(origin: .zero, size: size),
-            styleMask: [.borderless, .resizable, .nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.borderless, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false)
         // A plain window by default: it sits among normal windows on its own space, so other apps
