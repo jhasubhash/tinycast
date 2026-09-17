@@ -189,7 +189,10 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case .systemAction:
             return SystemActionCatalog.action(forEntryID: id).map { .systemAction(id: $0.id) }
         case .windowCommand:
-            return WindowCommandCatalog.command(forEntryID: id).map { .windowCommand(id: $0.id) }
+            if let command = WindowCommandCatalog.command(forEntryID: id) {
+                return .windowCommand(id: command.id)
+            }
+            return CustomWindowSize.id(fromEntryID: id).map { .customWindowSize(id: $0) }
         case .windowLayout:
             return WindowLayout.id(fromEntryID: id).map { .windowLayout(id: $0) }
         case .quicklink:
@@ -230,7 +233,8 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return CommandCatalog.command(for: self)?.sfSymbol ?? CustomQuickAction.sfSymbol
         case .systemAction: return SystemActionCatalog.action(forEntryID: id)?.sfSymbol ?? "questionmark"
         case .windowCommand:
-            return WindowCommandCatalog.command(forEntryID: id)?.sfSymbol ?? "questionmark"
+            return WindowCommandCatalog.command(forEntryID: id)?.sfSymbol
+                ?? CustomWindowSize.sfSymbol
         case .windowLayout: return WindowLayout.sfSymbol
         case .meeting: return "video.fill"
         case .application, .systemSettings, .appleShortcut, .extensionCommand, .plugin: return "questionmark"
@@ -254,6 +258,14 @@ extension AppEntry {
             id: layout.entryID, name: layout.name,
             url: URL(string: "tinycast://window-layout/" + layout.id.uuidString)!,
             bundleID: nil, kind: .windowLayout, symbolName: layout.iconSymbol)
+    }
+
+    /// A custom size shares the window commands' kind and section, as custom Quick Actions do.
+    init(_ size: CustomWindowSize) {
+        self.init(
+            id: size.entryID, name: size.name,
+            url: URL(string: "tinycast://window-size/" + size.id.uuidString)!,
+            bundleID: nil, kind: .windowCommand)
     }
 
     /// The one row a custom Quick Action draws, wherever it is offered from.
@@ -346,6 +358,7 @@ final class AppIndex {
     private var customCommandEntries: [AppEntry] = []
     private var assistantEntries: [AppEntry] = []
     private var windowCommandEntries: [AppEntry] = []
+    private var customWindowSizeEntries: [AppEntry] = []
     private var windowLayoutEntries: [AppEntry] = []
     private var quicklinkEntries: [AppEntry] = []
     private var appleShortcutEntries: [AppEntry] = []
@@ -486,6 +499,14 @@ final class AppIndex {
         publishEntries()
     }
 
+    /// Replaces the custom-size slice, which shares its section with the window commands.
+    func setCustomWindowSizes(_ sizes: [CustomWindowSize]) {
+        let entries = sizes.sorted(by: CustomWindowSize.precedes).map(AppEntry.init)
+        guard entries != customWindowSizeEntries else { return }
+        customWindowSizeEntries = entries
+        publishEntries()
+    }
+
     /// Replaces the layout slice; a toggle can't split its entries from their section.
     func setWindowLayouts(_ layouts: [WindowLayout]) {
         let entries = layouts.sorted(by: WindowLayout.precedes).map(AppEntry.init)
@@ -620,8 +641,8 @@ final class AppIndex {
             + Self.named(
                 extensionEntries + pluginEntries + quicklinkEntries + appleShortcutEntries
                     + snippetEntries + Self.systemActionEntries
-                    + windowLayoutEntries + windowCommandEntries + customCommandEntries
-                    + assistantEntries + quickActionEntries + commandEntries)
+                    + windowLayoutEntries + windowCommandEntries + customWindowSizeEntries
+                    + customCommandEntries + assistantEntries + quickActionEntries + commandEntries)
         guard updated != apps else { return }
         apps = updated
         entriesRevision &+= 1

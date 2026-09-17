@@ -242,7 +242,8 @@ These are image pixels, not printer dots.
 `rem` and `em` are pixel units fixed at the browser's default 16px root font size, so `24px`
 auto-converts to `1.5 rem`, `2em` to `32 px`, and `1rem + 8px` is `24 px`. The base is not a
 setting: a calculator has no stylesheet, so an `em` is always a root em. `pt` stays pints rather
-than typographic points, since volume claimed it first.
+than typographic points, since volume claimed it first. A `px`, `rem` or `em` answer copies without
+the space (`24px`) so it pastes straight into CSS; the card keeps the space every other unit shows.
 
 `to timespan` / `to duration` formats any evaluated time quantity, including
 `(1hr + 30min) to timespan` and `100km / 40km/h to duration`. It uses the typed parser directly.
@@ -278,10 +279,17 @@ still earns a card where a lone `100000` deliberately doesn't. A literal that ov
 
 ## Time zones
 
-`CalcTimeZone` answers `time in Tokyo`, `what time is it in London`, `5pm ldn in sf` and
+`CalcTimeZone` answers `time in Tokyo`, `SF time`, `what time is it in London`, `5pm ldn in sf` and
 `9:30am in nyc`. It runs **before the tokenizer** — a zone phrase is words, and `5pm ldn in sf`
-is not calculator input — but its grammar always needs an `in` / `to` / `at` connector, so an
-ordinary app search never reaches the zone table at all.
+is not calculator input. The `<place> time` form resolves the whole place through the existing
+city, alias and country tables, then uses the same path as `time in <place>`. Every other form needs
+a connector or a leading clock, so ordinary app searches stay outside the zone grammar.
+
+A clock followed by a recognized source, such as `5:30pm SF` or `5:30 pm SF`, converts to the
+Mac's own zone when no destination is supplied. The destination comes from the injected calendar;
+the clock still uses today's date in the source zone and its daylight-saving rules. Existing city,
+country and airport aliases work here too. A missing or unknown source stays silent, and an explicit
+destination keeps its meaning: `5pm in SF` still converts from the Mac's zone to San Francisco.
 
 The source is the Mac's own zone unless the query names one, which is what makes `5pm london in sf`
 work without either side being local. That zone comes from the **injected calendar**, so `Model/`

@@ -319,7 +319,7 @@ screens hold (see [palette.md](palette.md)).
   transition, anchored to the control that opened them.
 - **Feedback** — `showToast` stacks above the footer, `showHUD` is a centred pill, and `confirmAlert`
   goes through `DialogController` like every other question the app asks. Its dialog sits at
-  `.modalPanel`, above the palette's `.floating`, so a view command keeps its screen behind it — and
+  `.dialog`, above the palette's `.palette`, so a view command keeps its screen behind it — and
   the palette does not dismiss while it is up (`AppCore.isShowingDialog`), because dismissing pops to
   root, which would tear the command down before its `await confirmAlert(…)` ever returns.
 - **Command arguments** — a command declaring `arguments` shows inline fields sized to their
@@ -560,8 +560,8 @@ this). `ExtensionHostBridge` keeps those inside Tinycast: `raycast://extensions/
 runs that command when it's installed, anything else reopens the palette. Handing them to the workspace
 would launch Raycast itself.
 
-**Node built-ins** — `path`, `fs` (+ `fs/promises`, `createReadStream`/`createWriteStream`, and the
-descriptor calls `tar` unpacks through), `os`,
+**Node built-ins** — `path`, `fs` (+ `fs/promises`, `createReadStream`/`createWriteStream`, a snapshot-backed `opendir`, and
+the descriptor calls `tar` unpacks through), `os`,
 `child_process` (`exec`, `execFile`, `execSync`, `execFileSync`, `spawnSync`, and a buffered `spawn`,
 each async form reporting the child's real `pid` for `process.kill` — Timers pauses that way),
 `crypto` (hashes, HMAC, PBKDF2, AES-CBC/ECB, random, UUID), `zlib` (gzip/zlib/raw deflate, both

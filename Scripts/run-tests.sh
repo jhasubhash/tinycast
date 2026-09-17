@@ -326,7 +326,9 @@ run window-layout-test     Tinycast/Features/WindowManagement/Model/WindowComman
                            Tinycast/Features/WindowManagement/Model/WindowLayout.swift \
                            Tinycast/Features/WindowManagement/Model/WindowLayoutGeometry.swift \
                            Tinycast/Features/WindowManagement/Model/WindowLayoutPlan.swift \
-                           Tinycast/Features/WindowManagement/Model/WindowLayoutStore.swift
+                           Tinycast/Features/WindowManagement/Model/WindowLayoutStore.swift \
+                           Tinycast/Features/WindowManagement/Model/CustomWindowSize.swift \
+                           Tinycast/Features/WindowManagement/Model/CustomWindowSizeStore.swift
 run custom-command-test    Tinycast/Platform/PseudoTerminal.swift \
                            Tinycast/Features/CustomCommands/Model/CustomCommand.swift \
                            Tinycast/Features/CustomCommands/Model/RaycastScriptImport.swift \
@@ -496,8 +498,10 @@ run slow codex-turn-test   Tinycast/Platform/AppPaths.swift \
                            Tinycast/Features/AI/Service/CodexTurnRunner.swift
 run installed-ai-test     Tinycast/Features/AI/Model/*.swift \
                           Tinycast/Features/AI/Service/AIProvider.swift \
+                          Tinycast/Platform/AppPaths.swift \
                           Tinycast/Platform/ExecutableLocator.swift \
-                          Tinycast/Features/AI/Service/InstalledCLIProvider.swift
+                          Tinycast/Features/AI/Service/InstalledCLIProvider.swift \
+                          Tinycast/Features/AI/Service/InstalledAIManager.swift
 run assistant-store-test   Tinycast/Features/Settings/AppSettingsKey.swift \
                            Tinycast/Features/AI/Model/*.swift \
                            Tinycast/Features/AI/Service/AssistantStore.swift \
