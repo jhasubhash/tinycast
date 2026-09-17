@@ -161,6 +161,9 @@ final class LauncherCoordinator {
         case .snippet:
             let snippetID = String(app.id.dropFirst("snippet:".count))
             snippetCoordinator.expandSnippet(id: snippetID, target: previous)
+        case .scheduledTask:
+            guard let id = ScheduledTask.id(fromEntryID: app.id) else { return }
+            core.schedulerCoordinator.runTask(id: id)
         case .command, .quickAction, .customCommand, .assistant, .systemAction, .windowCommand,
             .windowLayout, .quicklink, .appleShortcut, .extensionCommand, .plugin, .meeting:
             break  // handled above
@@ -223,6 +226,8 @@ final class LauncherCoordinator {
         case .createSnippet:
             dismissPalette()
             snippetCoordinator.editSnippet(nil)
+        case .createScheduledTask:
+            core.schedulerEditorCoordinator.createTask()
         case .createWindowLayout:
             dismissPalette()
             windowLayoutCoordinator.editWindowLayout(nil)

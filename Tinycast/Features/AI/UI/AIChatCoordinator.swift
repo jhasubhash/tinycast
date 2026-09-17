@@ -237,11 +237,19 @@ final class AIChatCoordinator {
     private func toolAware(
         _ provider: any AIProvider, scopedTo slug: String?, allowed: Set<UUID>? = nil
     ) -> any AIProvider {
-        let tools = core.mcpCoordinator.tools(scopedTo: slug, allowed: allowed)
+        var tools = core.mcpCoordinator.tools(scopedTo: slug, allowed: allowed)
+        // The scheduler is offered as a native tool whenever the feature is on, MCP servers or not.
+        if core.settings.schedulerEnabled { tools.append(SchedulerAITool.tool) }
         guard capabilities.tools, !tools.isEmpty else { return provider }
         let chatID = chat.session.id
-        return AIToolLoopProvider(base: provider, tools: tools) { [mcp = core.mcpCoordinator] call in
-            await mcp.invoke(call, in: chatID)
+        let mcp = core.mcpCoordinator
+        let store = core.scheduledTasks
+        return AIToolLoopProvider(base: provider, tools: tools) { [mcp, store] call in
+            if call.name == SchedulerAITool.name {
+                return await SchedulerAITool.invoke(
+                    call, store: store, calendar: .current, now: Date())
+            }
+            return await mcp.invoke(call, in: chatID)
         }
     }
 

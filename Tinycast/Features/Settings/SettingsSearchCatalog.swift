@@ -112,7 +112,7 @@ enum SettingsSearchCatalog {
         + systemActions + commands + quicklinks + appleShortcuts + fallbacks + ai + quickActions + fileSearch
         + notes
         + snippets + navigation + windowManagement + clipboard + emoji + calendar
-        + extensions + plugins + permissions + backup + about
+        + extensions + plugins + scheduler + permissions + backup + about
 
     private static let general: [SettingsSearchEntry] = [
         .init(pane: .general, keywords: ["preferences", "settings"]),
@@ -545,6 +545,21 @@ enum SettingsSearchCatalog {
         .init(
             pane: .plugins,
             keywords: ["native", "swift", "dylib", "compiled", "plugin"])
+    ]
+
+    private static let scheduler: [SettingsSearchEntry] = [
+        .init(
+            pane: .scheduler,
+            keywords: ["cron", "timer", "recurring", "reminder", "automation", "periodic"]),
+        .init(
+            .schedulerScheduler, "Enable scheduler",
+            keywords: ["cron", "timer", "recurring", "automation"]),
+        .init(
+            .schedulerScheduler, "Create Scheduled Task",
+            keywords: ["new", "cron", "timer", "reminder", "script", "recurring"]),
+        .init(
+            group: .schedulerCommands, "Scheduled task commands",
+            keywords: ["shortcut", "hotkey", "launcher", "alias"])
     ]
 
     private static let permissions: [SettingsSearchEntry] = [

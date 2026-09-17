@@ -41,6 +41,21 @@ enum AppActionsMenu {
             rename.keepsMenuOpen = true
             items.append(rename)
         }
+        if app.kind == .scheduledTask {
+            items.append(
+                PopoverMenuItem(
+                    title: "Edit Scheduled Task", systemImage: "pencil", startsSection: true
+                ) {
+                    core.schedulerEditorCoordinator.editTask(entryID: app.id)
+                })
+            items.append(
+                PopoverMenuItem(
+                    title: "Delete Scheduled Task", systemImage: "trash", isDestructive: true
+                ) {
+                    core.paletteCoordinator.hidePalette(restoreFocus: false)
+                    core.schedulerEditorCoordinator.deleteTask(entryID: app.id)
+                })
+        }
         if app.canRevealInFinder {
             items.append(
                 PopoverMenuItem(title: "Show in Finder", systemImage: "folder", shortcut: "⌘↵") {

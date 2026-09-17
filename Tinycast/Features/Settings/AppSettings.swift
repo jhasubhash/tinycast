@@ -318,6 +318,19 @@ final class AppSettings {
         }
     }
 
+    /// Off by default: a scheduled task fires a script or action unattended, and arming that is
+    /// consent — a settings import must never flip it on.
+    var schedulerEnabled: Bool {
+        didSet { defaults.set(schedulerEnabled, forKey: Key.schedulerEnabled.rawValue) }
+    }
+
+    /// With the feature on, controls only whether its launcher section appears.
+    var schedulerShowInLauncher: Bool {
+        didSet {
+            defaults.set(schedulerShowInLauncher, forKey: Key.schedulerShowInLauncher.rawValue)
+        }
+    }
+
     /// With AI on, controls only whether the assistants' "Ask <Name>" rows appear in the launcher.
     var aiAssistantsShowInLauncher: Bool {
         didSet {
@@ -713,5 +726,9 @@ final class AppSettings {
         supportRemindersEnabled =
             defaults.object(forKey: Key.supportReminders.rawValue) == nil
             || defaults.bool(forKey: Key.supportReminders.rawValue)
+        schedulerEnabled = defaults.bool(forKey: Key.schedulerEnabled.rawValue)
+        schedulerShowInLauncher =
+            defaults.object(forKey: Key.schedulerShowInLauncher.rawValue) == nil
+            || defaults.bool(forKey: Key.schedulerShowInLauncher.rawValue)
     }
 }

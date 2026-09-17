@@ -20,5 +20,7 @@ private struct DialogTextField: ViewModifier {
             .background(
                 RoundedRectangle(cornerRadius: metrics.radius.menu, style: .continuous)
                     .fill(Theme.Colors.controlSurface))
+            .contentShape(Rectangle())
+            .pointerStyle(.horizontalText)
     }
 }

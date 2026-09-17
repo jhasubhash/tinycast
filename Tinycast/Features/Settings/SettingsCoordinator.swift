@@ -48,6 +48,7 @@ final class SettingsCoordinator {
             .environment(core.quicklinks)
             .environment(core.windowLayouts)
             .environment(core.customWindowSizes)
+            .environment(core.scheduledTasks)
             .environment(core.customWindowSizeCoordinator)
             .environment(core.calendarStore)
             .environment(core.aiSettings)

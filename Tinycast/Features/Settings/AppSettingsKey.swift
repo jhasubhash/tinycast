@@ -95,4 +95,6 @@ enum AppSettingsKey: String, CaseIterable {
     case quickActionPrimaryLanguage = "quickActionPrimaryLanguage"
     case quickActionSecondaryLanguage = "quickActionSecondaryLanguage"
     case supportReminders = "supportReminders"
+    case schedulerEnabled = "schedulerEnabled"
+    case schedulerShowInLauncher = "schedulerShowInLauncher"
 }

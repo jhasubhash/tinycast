@@ -12,6 +12,7 @@ final class AppCore {
     let quicklinks = QuicklinkStore()
     let windowLayouts = WindowLayoutStore()
     let customWindowSizes = CustomWindowSizeStore()
+    let scheduledTasks = ScheduledTaskStore()
     let clipboardStore = ClipboardStore()
     @ObservationIgnored private var clipboardTextIndexer: ClipboardTextIndexer?
     let clipboardManager: ClipboardManager
@@ -186,6 +187,11 @@ final class AppCore {
         injector: textInjector, appIndex: appIndex, hotKeys: hotKeys, favorites: favorites,
         visibility: visibility, ranking: launcherRanking, aliases: aliases,
         paletteCoordinator: paletteCoordinator, core: self)
+    @ObservationIgnored private(set) lazy var schedulerCoordinator = SchedulerCoordinator(
+        store: scheduledTasks, settings: settings, notifications: notificationPresenter,
+        appIndex: appIndex)
+    @ObservationIgnored private(set) lazy var schedulerEditorCoordinator =
+        SchedulerEditorCoordinator(store: scheduledTasks, core: self)
     @ObservationIgnored private(set) lazy var mcpCoordinator = MCPCoordinator(
         settings: settings, store: mcpSettings, manager: mcp, core: self)
     @ObservationIgnored private(set) lazy var aiChatCoordinator = AIChatCoordinator(
@@ -200,6 +206,8 @@ final class AppCore {
     /// Every confirmation, report and prompt; it also stops a held hotkey stacking them.
     @ObservationIgnored private lazy var dialogs = DialogController(settings: settings)
     private let healthTicker = HealthTicker()
+    @ObservationIgnored private let notificationPresenter = NotificationPresenter(
+        screen: { NSScreen.main })
 
     private init() {
         let launcherRanking = LauncherRankingStore()
@@ -336,6 +344,9 @@ final class AppCore {
             hotKeys.onRunPluginCommand = { [weak self] entryID in
                 self?.pluginCoordinator.runPluginCommand(entryID: entryID)
             }
+            hotKeys.onRunScheduledTask = { [weak self] id in
+                self?.schedulerCoordinator.runTask(id: id)
+            }
             extensions.onDidUninstall = { [weak self] entryIDs in
                 self?.extensionCoordinator.removeExtensionReferences(entryIDs: entryIDs)
             }
@@ -356,13 +367,15 @@ final class AppCore {
             SystemActionRunner.onAsyncFailure = { [weak self] id, failure in
                 self?.systemActionCoordinator.presentSystemActionFailure(id: id, failure: failure)
             }
+            schedulerCoordinator.applyEnabled()
             hotKeys.start(
                 customCommandIDs: Set(customCommands.commands.map(\.id)),
                 quicklinkIDs: Set(quicklinks.quicklinks.map(\.id)),
                 windowLayoutIDs: Set(windowLayouts.layouts.map(\.id)),
                 customWindowSizeIDs: Set(customWindowSizes.sizes.map(\.id)),
                 quickActionIDs: Set(customQuickActions.actions.map(\.id)),
-                assistantIDs: Set(assistants.assistants.map(\.id)))
+                assistantIDs: Set(assistants.assistants.map(\.id)),
+                scheduledTaskIDs: Set(scheduledTasks.tasks.map(\.id)))
             // Keeps running while Carbon pauses: the recorder needs its rewritten flags.
             hyperKeyTap.start(settings: settings)
 
@@ -444,6 +457,8 @@ final class AppCore {
             return appIndex.apps.first { $0.kind == .extensionCommand && $0.id == entryID }?.name
         case .pluginCommand(let entryID):
             return appIndex.apps.first { $0.kind == .plugin && $0.id == entryID }?.name
+        case .scheduledTask(let id):
+            return scheduledTasks.task(id: id)?.name
         case .togglePalette, .toggleAIBar, .command, .systemAction, .windowCommand:
             return nil
         }
@@ -623,6 +638,11 @@ final class AppCore {
         track(
             { _ = $0.snippetsShowInLauncher },
             reproject: { $0.snippetCoordinator.applySnippetsLauncherPresence() })
+        track(
+            {
+                _ = $0.schedulerEnabled
+                _ = $0.schedulerShowInLauncher
+            }, reproject: { $0.schedulerCoordinator.applySchedulerEnabled() })
         track({ _ = $0.appearance }, reproject: { $0.applyAppearance() })
         track({ _ = $0.interfaceSize }, reproject: { $0.windowController.applyInterfaceSize() })
     }

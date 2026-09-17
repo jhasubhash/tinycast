@@ -49,6 +49,8 @@ struct SettingsBackup: Codable {
         var customCommandsEnabled: Bool?
         var customCommandsShowInLauncher: Bool?
         var snippetsShowInLauncher: Bool?
+        // `schedulerEnabled` is absent: an import must not arm the machine to fire on a timer.
+        var schedulerShowInLauncher: Bool?
         // Safe to carry: it grants no permission class paste doesn't already prompt for.
         var navigationEnabled: Bool?
         var menuSearchDisabledApps: [String]?
@@ -150,6 +152,7 @@ extension SettingsBackup {
             customCommandsEnabled: s.customCommandsEnabled,
             customCommandsShowInLauncher: s.customCommandsShowInLauncher,
             snippetsShowInLauncher: s.snippetsShowInLauncher,
+            schedulerShowInLauncher: s.schedulerShowInLauncher,
             navigationEnabled: s.navigationEnabled,
             menuSearchDisabledApps: s.menuSearchDisabledApps,
             menuSearchShowsAppleMenu: s.menuSearchShowsAppleMenu,
@@ -387,6 +390,10 @@ extension SettingsBackup {
         }
         if let flag = s.snippetsShowInLauncher {
             settings.snippetsShowInLauncher = flag
+            count += 1
+        }
+        if let flag = s.schedulerShowInLauncher {
+            settings.schedulerShowInLauncher = flag
             count += 1
         }
         if let flag = s.navigationEnabled {

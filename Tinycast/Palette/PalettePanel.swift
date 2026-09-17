@@ -144,8 +144,11 @@ final class PalettePanel: NSPanel {
     /// Clip view and field editor both claim a cursor, so the panel settles it after `super`.
     private func applyCursorPolicy(for event: NSEvent) {
         guard Self.cursorEvents.contains(event.type) else { return }
+        // A hidden-field screen owns nowhere: leave its I-beams to SwiftUI's own pointerStyle.
+        let field = searchFieldRect
+        guard !field.isEmpty else { return }
         // Outset: the field editor AppKit installs is a point taller than the field it serves.
-        let text = searchFieldRect.insetBy(dx: -Self.fieldEditorSlack, dy: -Self.fieldEditorSlack)
+        let text = field.insetBy(dx: -Self.fieldEditorSlack, dy: -Self.fieldEditorSlack)
         let cursor: NSCursor =
             text.contains(convertPoint(fromScreen: NSEvent.mouseLocation)) ? .iBeam : .arrow
         guard NSCursor.current !== cursor else { return }

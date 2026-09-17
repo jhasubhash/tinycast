@@ -25,6 +25,8 @@ struct DialogChip: View {
                 .background(Capsule().fill(fill))
         }
         .buttonStyle(.plain)
+        // A click shouldn't leave the system's blue focus ring on our own capsule.
+        .focusEffectDisabled()
         .onHover { hovered = $0 }
         .accessibilityLabel(title)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)

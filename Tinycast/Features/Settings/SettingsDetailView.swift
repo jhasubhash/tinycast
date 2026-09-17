@@ -28,6 +28,7 @@ struct SettingsDetailView: View {
             case .calendar: CalendarSettingsView()
             case .extensions: ExtensionsSettingsView()
             case .plugins: PluginsSettingsView()
+            case .scheduler: SchedulerSettingsView()
             case .permissions: PermissionsSettingsView()
             case .backup: BackupSettingsView()
             case .about: AboutView()

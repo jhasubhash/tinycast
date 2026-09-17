@@ -105,6 +105,11 @@ final class PaletteCoordinator {
         windowController.popToRootNow()
     }
 
+    /// Leave a pushed screen for the one under it, or hide the palette when it was the root.
+    func closeScreen() {
+        if !palette.pop() { hidePalette() }
+    }
+
     /// True for the slim compact bar: compact on, launcher root, empty, not overflowed.
     var paletteIsCollapsed: Bool {
         // The AI bar collapses to the composer until its transcript has grown; nothing else applies.

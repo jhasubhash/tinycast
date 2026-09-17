@@ -19,6 +19,7 @@ final class HotKeyManager {
     var onRunAppleShortcut: ((UUID) -> Void)?
     var onRunExtensionCommand: ((String) -> Void)?
     var onRunPluginCommand: ((String) -> Void)?
+    var onRunScheduledTask: ((UUID) -> Void)?
     /// Names what only the stores know; the fixed catalogs resolve here. Set in `AppCore.start()`.
     var displayName: ((HotKeyAction) -> String?)?
     /// Whether the action's launcher category is switched on. Set in `AppCore.start()`.
@@ -62,10 +63,12 @@ final class HotKeyManager {
     private let boundAppleShortcutKey = "boundAppleShortcutIDs"
     private let boundExtensionCommandKey = "boundExtensionCommandEntryIDs"
     private let boundPluginCommandKey = "boundPluginCommandEntryIDs"
+    private let boundScheduledTaskKey = "boundScheduledTaskIDs"
 
     func start(
         customCommandIDs: Set<UUID>, quicklinkIDs: Set<UUID>, windowLayoutIDs: Set<UUID>,
-        customWindowSizeIDs: Set<UUID>, quickActionIDs: Set<UUID>, assistantIDs: Set<UUID>
+        customWindowSizeIDs: Set<UUID>, quickActionIDs: Set<UUID>, assistantIDs: Set<UUID>,
+        scheduledTaskIDs: Set<UUID>
     ) {
         prune(key: boundCustomCommandKey, live: customCommandIDs) { .customCommand(id: $0) }
         prune(key: boundAssistantKey, live: assistantIDs) { .assistant(id: $0) }
@@ -75,6 +78,7 @@ final class HotKeyManager {
             .customWindowSize(id: $0)
         }
         prune(key: boundQuickActionKey, live: quickActionIDs) { .quickAction(id: $0) }
+        prune(key: boundScheduledTaskKey, live: scheduledTaskIDs) { .scheduledTask(id: $0) }
         // After the prunes, so a dropped record can't survive in memory this session.
         for action in candidateActions { bindings[action] = storedBinding(for: action) }
 
@@ -125,6 +129,9 @@ final class HotKeyManager {
     var boundCustomWindowSizeIDs: [UUID] { boundIDs(key: boundCustomWindowSizeKey) }
 
     var boundQuickActionIDs: [UUID] { boundIDs(key: boundQuickActionKey) }
+
+    /// Scheduled-task UUIDs with a binding — its own namespace, pruned at start like the rest.
+    var boundScheduledTaskIDs: [UUID] { boundIDs(key: boundScheduledTaskKey) }
 
     /// Pruned by `AppleShortcutCoordinator` after a successful read, never here at launch.
     var boundAppleShortcutIDs: [UUID] { boundIDs(key: boundAppleShortcutKey) }
@@ -188,6 +195,8 @@ final class HotKeyManager {
             var set = Set(boundPluginCommandEntryIDs)
             if binding == nil { set.remove(entryID) } else { set.insert(entryID) }
             UserDefaults.standard.set(Array(set), forKey: boundPluginCommandKey)
+        case .scheduledTask(let id):
+            index(id, bound: binding != nil, key: boundScheduledTaskKey)
         case .togglePalette, .toggleAIBar, .command, .systemAction, .windowCommand:
             break
         }
@@ -235,6 +244,7 @@ final class HotKeyManager {
         actions += boundAppleShortcutIDs.map { .appleShortcut(id: $0) }
         actions += boundExtensionCommandEntryIDs.map { .extensionCommand(entryID: $0) }
         actions += boundPluginCommandEntryIDs.map { .pluginCommand(entryID: $0) }
+        actions += boundScheduledTaskIDs.map { .scheduledTask(id: $0) }
         actions += SystemAction.ID.allCases.map { .systemAction(id: $0) }
         actions += WindowCommand.ID.allCases.map { .windowCommand(id: $0) }
         candidateActionsCache = actions
@@ -273,6 +283,8 @@ final class HotKeyManager {
             return displayName?(action) ?? "Extension Command"
         case .pluginCommand:
             return displayName?(action) ?? "Plugin Command"
+        case .scheduledTask:
+            return displayName?(action) ?? "Scheduled Task"
         }
     }
 
@@ -314,6 +326,7 @@ final class HotKeyManager {
         case .appleShortcut(let id): onRunAppleShortcut?(id)
         case .extensionCommand(let entryID): onRunExtensionCommand?(entryID)
         case .pluginCommand(let entryID): onRunPluginCommand?(entryID)
+        case .scheduledTask(let id): onRunScheduledTask?(id)
         }
     }
 

@@ -11,6 +11,8 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     case menuSearch
     case switchWindows
     case schedule
+    /// The scheduled-task editor form, morphing the launcher panel; its field is hidden.
+    case schedulerEditor
     case uninstall
     case quicklinks
     case snippets
@@ -37,6 +39,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .menuSearch: return "menubar.rectangle"
         case .switchWindows: return "macwindow.on.rectangle"
         case .schedule: return "calendar"
+        case .schedulerEditor: return "calendar.badge.plus"
         case .uninstall: return "trash"
         case .quicklinks: return Quicklink.sfSymbol
         case .customCommandArguments: return CustomCommand.sfSymbol
@@ -57,6 +60,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .menuSearch: return "Search menu bar items…"
         case .switchWindows: return "Search open windows…"
         case .schedule: return "Search your schedule…"
+        case .schedulerEditor: return "Add a scheduled task…"
         case .uninstall: return "Filter files and folders by name…"
         case .quicklinks: return "Search quicklinks…"
         case .snippets: return "Search snippets…"

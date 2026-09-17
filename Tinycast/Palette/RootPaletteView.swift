@@ -113,6 +113,8 @@ struct RootPaletteView: View {
             return CalculatorHistoryScreen(
                 history: calcHistory, currencyRates: currencyRates, core: core, vm: vm,
                 openActions: openActions)
+        case .schedulerEditor:
+            return SchedulerEditorScreen(coordinator: core.schedulerEditorCoordinator, vm: vm)
         case .extensionCommand:
             return ExtensionCommandScreen(
                 screen: extensionScreen, extensions: extensions, vm: vm, openActions: openActions)

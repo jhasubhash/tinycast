@@ -17,6 +17,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case extensionCommand
         case meeting
         case plugin
+        case scheduledTask
 
         var descriptor: KindDescriptor {
             switch self {
@@ -96,6 +97,11 @@ struct AppEntry: Identifiable, Hashable, Sendable {
                 return KindDescriptor(
                     label: "Plugin", sectionTitle: "Plugins",
                     openVerb: "Open Plugin", canHideFromSearch: false,
+                    canRevealInFinder: false, isSymbolIcon: true)
+            case .scheduledTask:
+                return KindDescriptor(
+                    label: "Scheduled Task", sectionTitle: "Scheduled Tasks",
+                    openVerb: "Run Scheduled Task", canHideFromSearch: false,
                     canRevealInFinder: false, isSymbolIcon: true)
             }
         }
@@ -203,6 +209,8 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return .extensionCommand(entryID: id)
         case .plugin:
             return .pluginCommand(entryID: id)
+        case .scheduledTask:
+            return ScheduledTask.id(fromEntryID: id).map { .scheduledTask(id: $0) }
         case .snippet, .meeting:
             return nil
         }
@@ -237,6 +245,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
                 ?? CustomWindowSize.sfSymbol
         case .windowLayout: return WindowLayout.sfSymbol
         case .meeting: return "video.fill"
+        case .scheduledTask: return ScheduledTask.sfSymbol
         case .application, .systemSettings, .appleShortcut, .extensionCommand, .plugin: return "questionmark"
         }
     }
@@ -366,6 +375,7 @@ final class AppIndex {
     private var extensionEntries: [AppEntry] = []
     private var pluginEntries: [AppEntry] = []
     private var meetingEntries: [AppEntry] = []
+    private var scheduledTaskEntries: [AppEntry] = []
     /// The catalog's commands a disabled feature hides; the Commands slice is recomputed from it.
     private var hiddenCommands: Set<CommandID> = []
     private var nameCache = BundleNameCache()
@@ -488,6 +498,13 @@ final class AppIndex {
     func setPluginCommands(_ entries: [AppEntry]) {
         guard entries != pluginEntries else { return }
         pluginEntries = entries
+        publishEntries()
+    }
+
+    /// Replaces the scheduled-task slice; the coordinator gates it on both switches before pushing.
+    func setScheduledTasks(_ entries: [AppEntry]) {
+        guard entries != scheduledTaskEntries else { return }
+        scheduledTaskEntries = entries
         publishEntries()
     }
 
@@ -642,7 +659,8 @@ final class AppIndex {
                 extensionEntries + pluginEntries + quicklinkEntries + appleShortcutEntries
                     + snippetEntries + Self.systemActionEntries
                     + windowLayoutEntries + windowCommandEntries + customWindowSizeEntries
-                    + customCommandEntries + assistantEntries + quickActionEntries + commandEntries)
+                    + customCommandEntries + scheduledTaskEntries + assistantEntries
+                    + quickActionEntries + commandEntries)
         guard updated != apps else { return }
         apps = updated
         entriesRevision &+= 1

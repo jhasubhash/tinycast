@@ -24,6 +24,8 @@ enum HotKeyAction: Hashable, Sendable {
     case extensionCommand(entryID: String)
     /// Keyed by `AppEntry.id`, which survives a reinstall of the plugin.
     case pluginCommand(entryID: String)
+    /// A scheduled task run on demand, keyed by its stable id.
+    case scheduledTask(id: UUID)
 
     /// The UserDefaults key, and the `HotKeyCenter` registration id: one per action.
     var defaultsKey: String {
@@ -45,6 +47,7 @@ enum HotKeyAction: Hashable, Sendable {
         case .assistant(let id): "hotkey.assistant." + id.uuidString.lowercased()
         case .extensionCommand(let entryID): "hotkey.extensionCommand." + entryID
         case .pluginCommand(let entryID): "hotkey.pluginCommand." + entryID
+        case .scheduledTask(let id): "hotkey.scheduledTask." + id.uuidString.lowercased()
         }
     }
 

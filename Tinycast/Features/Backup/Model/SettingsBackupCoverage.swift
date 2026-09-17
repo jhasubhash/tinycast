@@ -30,6 +30,7 @@ enum SettingsBackupCoverage {
         "customCommandsEnabled": .customCommandsEnabled,
         "customCommandsShowInLauncher": .customCommandsShowInLauncher,
         "snippetsShowInLauncher": .snippetsShowInLauncher,
+        "schedulerShowInLauncher": .schedulerShowInLauncher,
         "navigationEnabled": .navigationEnabled,
         "menuSearchDisabledApps": .menuSearchDisabledApps,
         "menuSearchShowsAppleMenu": .menuSearchShowsAppleMenu,
@@ -167,6 +168,9 @@ enum SettingsBackupCoverage {
         AppSettingsKey.quickActionPrimaryLanguage.rawValue:
             "Follows the languages the person at this Mac reads, not the one who wrote the backup.",
         AppSettingsKey.quickActionSecondaryLanguage.rawValue:
-            "Follows the languages the person at this Mac reads, not the one who wrote the backup."
+            "Follows the languages the person at this Mac reads, not the one who wrote the backup.",
+        AppSettingsKey.schedulerEnabled.rawValue:
+            "Doubles as consent to run a scheduled script or action unattended; an import must not "
+            + "arm the machine to fire on a timer by itself."
     ]
 }
