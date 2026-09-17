@@ -238,14 +238,14 @@ final class AIChatCoordinator {
         _ provider: any AIProvider, scopedTo slug: String?, allowed: Set<UUID>? = nil
     ) -> any AIProvider {
         var tools = core.mcpCoordinator.tools(scopedTo: slug, allowed: allowed)
-        // The scheduler is offered as a native tool whenever the feature is on, MCP servers or not.
-        if core.settings.schedulerEnabled { tools.append(SchedulerAITool.tool) }
+        // The scheduler's reminder tools are offered whenever the feature is on, MCP servers or not.
+        if core.settings.schedulerEnabled { tools.append(contentsOf: SchedulerAITool.tools) }
         guard !tools.isEmpty else { return provider }
         let chatID = chat.session.id
         let mcp = core.mcpCoordinator
         let store = core.scheduledTasks
         let invoke: @Sendable (AIToolCall) async -> AIToolResult = { [mcp, store] call in
-            if call.name == SchedulerAITool.name {
+            if SchedulerAITool.handles(call.name) {
                 return await SchedulerAITool.invoke(
                     call, store: store, calendar: .current, now: Date())
             }

@@ -444,6 +444,12 @@ run updates-test           Tinycast/Features/Updates/Model/*.swift \
 run support-test           Tinycast/Features/Support/Model/*.swift
 run scheduler-test         Tinycast/Features/Notifications/Model/NotificationSpec.swift \
                            Tinycast/Features/Scheduler/Model/*.swift
+run scheduler-ai-test      Tinycast/Features/Notifications/Model/NotificationSpec.swift \
+                           Tinycast/Features/Scheduler/Model/*.swift \
+                           Tinycast/Features/Scheduler/Service/ScheduledTaskStore.swift \
+                           Tinycast/Features/AI/Model/AITool.swift \
+                           Tinycast/Features/AI/Model/JSONValue.swift \
+                           Tinycast/Features/Scheduler/AI/SchedulerAITool.swift
 run ai-provider-test       Tinycast/Features/Settings/AppSettingsKey.swift \
                            Tinycast/Features/AI/Model/*.swift \
                            Tinycast/Features/AI/Settings/AISettingsStore.swift
