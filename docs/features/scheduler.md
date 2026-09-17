@@ -54,9 +54,13 @@ reschedules and re-projects launcher rows.
 
 `ScheduleEngine` is the pure math: `nextFireDate(for:after:calendar:)` gives the first occurrence a
 task owes past an anchor, and `missedOccurrences(for:since:until:calendar:cap:)` enumerates the
-catch-up set. `NaturalDateParser` turns a typed phrase ("tomorrow 9am", "in 20 minutes") into a
-`once` rule for the editor, and `ScheduleFormatter.summary(of:)` renders the human line shown on each
-row and as the launcher subtitle.
+catch-up set. `NaturalDateParser` reads a time out of a phrase — relative durations ("in 20 minutes")
+first, since `NSDataDetector` resolves only the absolute forms ("tomorrow 9am") — and each `Match`
+carries the span it matched, so a caller can lift the time out of a sentence and keep the rest.
+`ReminderPhraseParser` builds on it: it turns a whole launcher phrase into a `ParsedReminder`
+(title + `ScheduleRule`) by reading a recurrence word and a time, then cleaning the words left over
+into a title. `ScheduledTask.notification(title:body:rule:now:)` is the shared builder both it and the
+AI tool use, and `ScheduleFormatter.summary(of:)` renders the human line shown on each row.
 
 ## Firing and catch-up
 
@@ -107,6 +111,23 @@ in-process, so `toolAware` arms `AppleIntelligenceProvider.executingHostTools`.
 `AppleIntelligenceHostTool` bridges the `AITool` onto a `FoundationModels.Tool` — its
 `AppleIntelligenceToolSchema` turns the JSON-Schema parameters into a `GenerationSchema`, and each
 call reports a `.toolCall`/`.toolResult` pair into the same stream a loop route would.
+
+## Reminder fallback
+
+Whenever the feature is on, the launcher offers a **Schedule a Reminder** fallback
+(`Fallback.Builtin.scheduleReminder`, wearing the *Create Scheduled Task* name and clock glyph). ↵ on
+its "Use “<query>” with…" row runs `SchedulerEditorCoordinator.scheduleFromPhrase`, which parses the
+typed phrase and posts a notification-only task with no form — so, like the AI tool, it can never
+register a script.
+
+`scheduleFromPhrase` tries the deterministic `ReminderPhraseParser` first: it is Foundation-only,
+instant, and works on every Mac with no AI, covering "remind me to book the ticket in next 20 min",
+"drink water every day at 8am" and the like. Only when it returns nil does the phrase fall to
+`ReminderPhraseModel`, the on-device backstop that extracts `{title, when, repeats}` from the Apple
+Intelligence model via guided generation (`@Generable`). The model path returns nil whenever the model
+is unavailable or its answer is unusable, so an unparseable phrase surfaces "Couldn't find a time in
+…" rather than a guess. Unlike the AI-chat tool, this fallback needs no tool-capable model — the
+deterministic parser is the whole path on most Macs.
 
 ## Settings and backup
 

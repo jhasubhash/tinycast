@@ -46,4 +46,18 @@ struct ScheduledTask: Codable, Hashable, Sendable, Identifiable {
         guard entryID.hasPrefix(entryIDPrefix) else { return nil }
         return UUID(uuidString: String(entryID.dropFirst(entryIDPrefix.count)))
     }
+
+    /// A notification task from parsed intent: a one-shot deletes itself, a recurring one persists.
+    static func notification(
+        title: String, body: String = "", rule: ScheduleRule, now: Date
+    ) -> ScheduledTask {
+        let repeats: Bool = { if case .once = rule { return false } else { return true } }()
+        let spec = NotificationSpec(
+            id: UUID(), title: title, body: body, style: .banner, corner: .topTrailing,
+            dwell: nil, actions: [])
+        return ScheduledTask(
+            id: UUID(), name: title, isEnabled: true, rule: rule,
+            action: .postNotification(spec), catchUp: .fireOnceOnResume, deleteAfterRun: !repeats,
+            lastFired: nil, createdAt: now)
+    }
 }

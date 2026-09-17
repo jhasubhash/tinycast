@@ -28,6 +28,32 @@ final class SchedulerEditorCoordinator {
         present()
     }
 
+    /// The launcher reminder fallback: parse a typed phrase into a notification task and confirm via
+    /// a HUD, no form. The deterministic parser answers instantly; only its miss falls to the model.
+    func scheduleFromPhrase(_ text: String) {
+        let phrase = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !phrase.isEmpty else { return }
+        core.paletteCoordinator.hidePalette(restoreFocus: false)
+        let now = Date(), calendar = Calendar.current
+        if let parsed = ReminderPhraseParser.parse(phrase, now: now, calendar: calendar) {
+            commit(parsed, now: now)
+            return
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            if let parsed = await ReminderPhraseModel.extract(phrase, now: now, calendar: calendar) {
+                commit(parsed, now: now)
+            } else {
+                core.showMessage("Couldn't find a time in “\(phrase)”.", tone: .danger)
+            }
+        }
+    }
+
+    private func commit(_ parsed: ParsedReminder, now: Date) {
+        store.add(ScheduledTask.notification(title: parsed.title, rule: parsed.rule, now: now))
+        core.showMessage("Reminder set — \(ScheduleFormatter.rule(parsed.rule))")
+    }
+
     /// The form's primary action: persist the draft, then leave the editor.
     func save() {
         guard draft.isValid else { return }

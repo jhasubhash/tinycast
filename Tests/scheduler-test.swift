@@ -25,6 +25,10 @@ struct SchedulerTests {
         dailySurvivesSpringForward()
         disabledTaskNeverFires()
         naturalDateParserParsesTomorrowAtNine()
+        naturalDateParserParsesRelativeDurations()
+        reminderPhraseParserLiftsTitleFromRelativeTime()
+        reminderPhraseParserReadsRecurrence()
+        reminderPhraseParserRejectsTimelessPhrase()
 
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
@@ -39,6 +43,14 @@ struct SchedulerTests {
     private static let nyCalendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        return calendar
+    }()
+
+    /// Absolute clock-times are read in the system zone (as `NSDataDetector` and the real callers
+    /// do), so a wall-clock assertion needs a calendar in that same zone rather than UTC.
+    private static let localCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
         return calendar
     }()
 
@@ -209,5 +221,48 @@ struct SchedulerTests {
     static func naturalDateParserParsesTomorrowAtNine() {
         let parsed = NaturalDateParser.date(from: "tomorrow at 9am", now: baseCreatedAt, calendar: utcCalendar)
         expect(parsed != nil, "natural language 'tomorrow at 9am' parses to a date")
+    }
+
+    static func naturalDateParserParsesRelativeDurations() {
+        let cases: [(String, Int, Calendar.Component)] = [
+            ("in 20 minutes", 20, .minute), ("in next 5 minutes", 5, .minute),
+            ("in 5 min", 5, .minute), ("in 2 hours", 2, .hour), ("in an hour", 1, .hour),
+            ("in 3 days", 3, .day),
+        ]
+        for (phrase, amount, unit) in cases {
+            let expected = utcCalendar.date(byAdding: unit, value: amount, to: baseCreatedAt)
+            expect(
+                NaturalDateParser.date(from: phrase, now: baseCreatedAt, calendar: utcCalendar)
+                    == expected,
+                "relative time '\(phrase)' resolves to now + \(amount) \(unit)")
+        }
+    }
+
+    static func reminderPhraseParserLiftsTitleFromRelativeTime() {
+        let parsed = ReminderPhraseParser.parse(
+            "remind me to book the ticket in next 20 min", now: baseCreatedAt, calendar: utcCalendar)
+        let expected = utcCalendar.date(byAdding: .minute, value: 20, to: baseCreatedAt)!
+        expect(parsed?.title == "Book the ticket", "filler and time are stripped to leave the title")
+        expect(parsed?.rule == .once(expected), "a relative phrase becomes a one-shot at now + 20 min")
+    }
+
+    static func reminderPhraseParserReadsRecurrence() {
+        let weekly = ReminderPhraseParser.parse(
+            "standup every weekday at 9:30am", now: baseCreatedAt, calendar: localCalendar)
+        expect(weekly?.title == "Standup", "recurrence and time words are removed from the title")
+        expect(
+            weekly?.rule == .weekly(weekdays: [2, 3, 4, 5, 6], hour: 9, minute: 30),
+            "'every weekday at 9:30am' is a Mon–Fri weekly rule at 09:30")
+
+        let daily = ReminderPhraseParser.parse(
+            "drink water every day at 8am", now: baseCreatedAt, calendar: localCalendar)
+        expect(daily?.title == "Drink water", "a daily phrase keeps only its imperative title")
+        expect(daily?.rule == .daily(hour: 8, minute: 0), "'every day at 8am' is a daily rule at 08:00")
+    }
+
+    static func reminderPhraseParserRejectsTimelessPhrase() {
+        expect(
+            ReminderPhraseParser.parse("buy milk", now: baseCreatedAt, calendar: utcCalendar) == nil,
+            "a phrase with no time and no recurrence has nothing to schedule")
     }
 }

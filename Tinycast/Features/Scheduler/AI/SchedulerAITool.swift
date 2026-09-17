@@ -76,14 +76,8 @@ enum SchedulerAITool {
             rule = .once(fireDate)
         }
 
-        let spec = NotificationSpec(
-            id: UUID(), title: args.title, body: args.body ?? "", style: .banner,
-            corner: .topTrailing, dwell: nil, actions: [])
-        let task = ScheduledTask(
-            id: UUID(), name: args.title, isEnabled: true, rule: rule,
-            action: .postNotification(spec), catchUp: .fireOnceOnResume, deleteAfterRun: !repeats,
-            lastFired: nil,
-            createdAt: now)
+        let task = ScheduledTask.notification(
+            title: args.title, body: args.body ?? "", rule: rule, now: now)
         store.add(task)
 
         let stamp = formatter.string(from: fireDate)

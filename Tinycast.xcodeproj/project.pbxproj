@@ -371,6 +371,7 @@
 		8CFF2D2BF36F60659C8570A3 /* SettingsPaneScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F7C8CBD0AA75D016DBFC06 /* SettingsPaneScanner.swift */; };
 		8D20CD7B6918873960F84291 /* NoteDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8B10DA3A9B1CBD9A03F3DE5 /* NoteDocument.swift */; };
 		8D42634B05BAC042A1BE467C /* QuickActionPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8088CD8FD5F95E1A2CA4AC42 /* QuickActionPanelController.swift */; };
+		8D529ABF4AAF4FAE57F49274 /* ReminderPhraseModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40209F14258BEBB27B410E5 /* ReminderPhraseModel.swift */; };
 		8D529C8F3AB579941067FE98 /* MessageHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976A1F05AD82DB8A04B3C3F9 /* MessageHUDView.swift */; };
 		8DCF330D30E59FFEE8C8E8CF /* PaletteDropGuideController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29A8B82DCB1B7D131BF0908A /* PaletteDropGuideController.swift */; };
 		8E30C461429C894907FAD94D /* PaletteEscapeAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D7E98E448F05816493DB37 /* PaletteEscapeAction.swift */; };
@@ -567,6 +568,7 @@
 		DD0DE9D16B0BAA8126EE9DB6 /* SettingsAnchor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41B7D28CD2AF8AD14DA6FC3 /* SettingsAnchor.swift */; };
 		DD25D0E22E5729CF612FA1AE /* WindowDragHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F1545635C1E94D5E7DFECF1 /* WindowDragHandle.swift */; };
 		DD98502F3400C05048D96D9A /* SkillStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED7528E8A0215A6B1E63D3D /* SkillStore.swift */; };
+		DDAF8E6519D887317648CD06 /* ReminderPhraseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C001E7987FDF07CFAE94F701 /* ReminderPhraseParser.swift */; };
 		DDFA439EA7942183414375DC /* AppPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A96350EBE68EC79497FA2D /* AppPaths.swift */; };
 		DDFF8A9F420A4733DFA32A07 /* ReleaseFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = D28281DFC434C75F8A594635 /* ReleaseFeed.swift */; };
 		DE04F1715F705AA1D0F540B3 /* PluginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE198B84CAAB52EB6977F4F9 /* PluginManager.swift */; };
@@ -1202,6 +1204,7 @@
 		BF36BDC9ACE867DCC2CCF746 /* SystemPromptEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPromptEditor.swift; sourceTree = "<group>"; };
 		BF96A1566757811AD434C0F9 /* MenuPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPanel.swift; sourceTree = "<group>"; };
 		BFB023D167225228757CC4B2 /* HealthTicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthTicker.swift; sourceTree = "<group>"; };
+		C001E7987FDF07CFAE94F701 /* ReminderPhraseParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderPhraseParser.swift; sourceTree = "<group>"; };
 		C004F2C2EFDD340A73C6AB02 /* PaletteCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaletteCoordinator.swift; sourceTree = "<group>"; };
 		C0599199132DAFBE12C59FBD /* MeetingDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDay.swift; sourceTree = "<group>"; };
 		C214E40D42F4812F141C16A8 /* ColorPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPreview.swift; sourceTree = "<group>"; };
@@ -1259,6 +1262,7 @@
 		D381DD8CB296A6D5CFF90111 /* ClipboardFileKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardFileKind.swift; sourceTree = "<group>"; };
 		D3A6E15A480A4779ACCE259D /* EmptyResults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyResults.swift; sourceTree = "<group>"; };
 		D3F82845FDA307DF71676352 /* CalendarAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarAccess.swift; sourceTree = "<group>"; };
+		D40209F14258BEBB27B410E5 /* ReminderPhraseModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderPhraseModel.swift; sourceTree = "<group>"; };
 		D43E5D47E198B86901D75515 /* ChatGPTSubscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTSubscription.swift; sourceTree = "<group>"; };
 		D43F1080FB443A1D0616790E /* FavoritesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesStore.swift; sourceTree = "<group>"; };
 		D476200394A9B022AF3682BA /* SchedulerTaskControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulerTaskControls.swift; sourceTree = "<group>"; };
@@ -1364,7 +1368,7 @@
 		FE41DC04958D7C2FF8C47F62 /* CustomCommandCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCommandCoordinator.swift; sourceTree = "<group>"; };
 		FE72CE02F853ACE956627347 /* SystemAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAction.swift; sourceTree = "<group>"; };
 		FF447647B325A119F2B3BCD1 /* UnitCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitCategory.swift; sourceTree = "<group>"; };
-		"TEMP_963DAD6F-ADC7-4694-9856-A99EC20236F1" /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+		"TEMP_130D432E-DB8F-4736-9F72-104199807E08" /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2431,6 +2435,7 @@
 		8F8696630F5BAE01F4D6E163 /* Service */ = {
 			isa = PBXGroup;
 			children = (
+				D40209F14258BEBB27B410E5 /* ReminderPhraseModel.swift */,
 				DB2D58309BD3BAD107D8BBA6 /* ScheduledTaskStore.swift */,
 			);
 			path = Service;
@@ -3105,6 +3110,7 @@
 			isa = PBXGroup;
 			children = (
 				1EEAFA06ED345E6D9503D672 /* NaturalDateParser.swift */,
+				C001E7987FDF07CFAE94F701 /* ReminderPhraseParser.swift */,
 				406A782FE7709F62221290CF /* ScheduledTask.swift */,
 				A1627EDDB24B0DF14F46C71F /* ScheduleEngine.swift */,
 				BDAADFB6B6A9CE3046261BC0 /* ScheduleFormatter.swift */,
@@ -3250,10 +3256,10 @@
 			path = Model;
 			sourceTree = "<group>";
 		};
-		"TEMP_92E49B57-3E02-4F6F-A04B-FF244D9BC6FF" /* tinycast */ = {
+		"TEMP_82E91849-E366-4BFF-A50D-E998D8F24527" /* tinycast */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_963DAD6F-ADC7-4694-9856-A99EC20236F1" /* Signing.xcconfig */,
+				"TEMP_130D432E-DB8F-4736-9F72-104199807E08" /* Signing.xcconfig */,
 			);
 			path = tinycast;
 			sourceTree = "<group>";
@@ -3877,6 +3883,8 @@
 				DDFF8A9F420A4733DFA32A07 /* ReleaseFeed.swift in Sources */,
 				607D38D86E7C4763DD28C8D0 /* ReleaseNotes.swift in Sources */,
 				18B3F78B6363E80149D4A646 /* ReleaseNotesView.swift in Sources */,
+				8D529ABF4AAF4FAE57F49274 /* ReminderPhraseModel.swift in Sources */,
+				DDAF8E6519D887317648CD06 /* ReminderPhraseParser.swift in Sources */,
 				9B05C47A7414D04E20237B09 /* RenderNode.swift in Sources */,
 				AD98F015439106F0E9D32015 /* RightClick.swift in Sources */,
 				47E13BC63F8BE11EDF25EA82 /* RootPaletteView.swift in Sources */,
@@ -4153,7 +4161,7 @@
 		};
 		5DD32DD22FF4D687291A2701 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_963DAD6F-ADC7-4694-9856-A99EC20236F1" /* Signing.xcconfig */;
+			baseConfigurationReference = "TEMP_130D432E-DB8F-4736-9F72-104199807E08" /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -4237,7 +4245,7 @@
 		};
 		CC3CD44A1E55885C69F58A29 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_963DAD6F-ADC7-4694-9856-A99EC20236F1" /* Signing.xcconfig */;
+			baseConfigurationReference = "TEMP_130D432E-DB8F-4736-9F72-104199807E08" /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
