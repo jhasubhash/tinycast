@@ -7,9 +7,11 @@ options:
   groupSortPosition: top
 
 configFiles:
-  # Debug's signing identity comes from the gitignored Signing.local.xcconfig when it exists,
-  # else the self-signed default in Signing.xcconfig — so any clone builds. Release pins its own.
+  # Both configs read the signing identity from Signing.xcconfig: the self-signed default, overridden
+  # by the gitignored Signing.local.xcconfig when present. A clone without it (CI) signs self-signed,
+  # so official releases stay self-signed; a machine with the override signs its local Release too.
   Debug: Signing.xcconfig
+  Release: Signing.xcconfig
 
 settings:
   base:
@@ -20,9 +22,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
   configs:
     Release:
-      # Pinned here, above any local override: CI and every release sign self-signed.
-      CODE_SIGN_IDENTITY: "Tinycast Self-Signed"
-      DEVELOPMENT_TEAM: ""
+      # Signing identity + team now come from Signing.xcconfig (see configFiles), not pinned here.
       # Release-only: library validation refuses Debug's `.debug.dylib`, whose team never matches.
       ENABLE_HARDENED_RUNTIME: YES
       # Strip the shipped binary (dSYM is still generated first) and drop unused code.

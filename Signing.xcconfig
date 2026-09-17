@@ -1,10 +1,10 @@
-// Debug signing identity, kept out of the committed project so any clone can build.
+// Signing identity for Debug and Release, kept out of the committed project so any clone can build.
 //
 // The default below is the portable self-signed identity every checkout shares
 // (create it once — see docs/signing.md). A machine with its own Apple identity
 // drops both keys into an uncommitted, gitignored Signing.local.xcconfig; the
 // optional include at the bottom picks it up at build time and overrides them.
-// Release pins its own identity in project.yml, so a local override never ships.
+// A clone without that file (CI) signs self-signed, so official releases stay self-signed.
 CODE_SIGN_IDENTITY = Tinycast Self-Signed
 DEVELOPMENT_TEAM =
 

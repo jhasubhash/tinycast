@@ -1314,7 +1314,7 @@
 		FE41DC04958D7C2FF8C47F62 /* CustomCommandCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCommandCoordinator.swift; sourceTree = "<group>"; };
 		FE72CE02F853ACE956627347 /* SystemAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAction.swift; sourceTree = "<group>"; };
 		FF447647B325A119F2B3BCD1 /* UnitCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitCategory.swift; sourceTree = "<group>"; };
-		"TEMP_C4A67571-F1DA-43A9-8F43-6F0BBD435BD8" /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+		"TEMP_DB4A3D55-C5E7-4C27-ABA0-E1ADD9239DD0" /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -3095,10 +3095,10 @@
 			path = Model;
 			sourceTree = "<group>";
 		};
-		"TEMP_47E245A7-62ED-419F-99BA-1710CC7E4C87" /* tinycast */ = {
+		"TEMP_06DD6AE6-FBC3-4048-AB29-301552548577" /* tinycast */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_C4A67571-F1DA-43A9-8F43-6F0BBD435BD8" /* Signing.xcconfig */,
+				"TEMP_DB4A3D55-C5E7-4C27-ABA0-E1ADD9239DD0" /* Signing.xcconfig */,
 			);
 			path = tinycast;
 			sourceTree = "<group>";
@@ -3886,7 +3886,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
-				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -3974,7 +3973,7 @@
 		};
 		5DD32DD22FF4D687291A2701 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_C4A67571-F1DA-43A9-8F43-6F0BBD435BD8" /* Signing.xcconfig */;
+			baseConfigurationReference = "TEMP_DB4A3D55-C5E7-4C27-ABA0-E1ADD9239DD0" /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -4058,6 +4057,7 @@
 		};
 		CC3CD44A1E55885C69F58A29 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = "TEMP_DB4A3D55-C5E7-4C27-ABA0-E1ADD9239DD0" /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -4089,14 +4089,12 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_IDENTITY = "Tinycast Self-Signed";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEPLOYMENT_POSTPROCESSING = YES;
-				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
