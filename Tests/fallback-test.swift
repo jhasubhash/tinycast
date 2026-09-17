@@ -22,6 +22,7 @@ struct FallbackTests {
         ordering()
         headers()
         verbs()
+        intents()
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
     }
@@ -124,5 +125,31 @@ struct FallbackTests {
         verbs.append(Fallback.quicklink(UUID()).openVerb)
         check("every fallback names its own action", verbs.allSatisfy { !$0.isEmpty })
         check("the verbs are distinct", Set(verbs).count == verbs.count, "got \(verbs)")
+    }
+
+    // MARK: - Intents
+
+    static func intents() {
+        check("reminder maps to scheduling", Fallback.Builtin.scheduleReminder.intent == .reminder)
+        check("shell maps to run-shell", Fallback.Builtin.runShellCommand.intent == .shellCommand)
+        check("file search maps to search-files", Fallback.Builtin.searchFiles.intent == .fileSearch)
+        check("ai chat maps to a question", Fallback.Builtin.aiChat.intent == .aiQuestion)
+        // Every built-in carries an intent, or a query could never float it up.
+        check("every built-in has an intent", Fallback.Builtin.allCases.allSatisfy { $0.intent != nil })
+        check("a quicklink has no intent", Fallback.quicklink(UUID()).builtin?.intent == nil)
+
+        let offered: [Fallback] = Fallback.Builtin.allCases.map(Fallback.builtin)
+        check(
+            "no intent leaves the order as given",
+            Fallback.prioritised(offered, forIntents: []) == offered)
+        check(
+            "one intent floats its fallback first",
+            Fallback.prioritised(offered, forIntents: [.reminder]).first == .builtin(.scheduleReminder))
+        let ranked = Fallback.prioritised(offered, forIntents: [.reminder, .fileSearch])
+        check(
+            "intents lead in rank order, the rest keep their place",
+            Array(ranked.prefix(2)) == [.builtin(.scheduleReminder), .builtin(.searchFiles)],
+            "got \(ranked)")
+        check("prioritised is a permutation", Set(ranked) == Set(offered) && ranked.count == offered.count)
     }
 }

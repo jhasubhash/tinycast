@@ -129,10 +129,12 @@ is unavailable or its answer is unusable, so an unparseable phrase surfaces "Cou
 …" rather than a guess. Unlike the AI-chat tool, this fallback needs no tool-capable model — the
 deterministic parser is the whole path on most Macs.
 
-When the typed phrase reads as a reminder request — `ReminderPhraseParser.signalsIntent(in:)` matches a
-keyword like "remind me" or "notify me", before any time is even typed — `FallbackCoordinator.entries`
-floats this row to the top of the fallback list so ↵ lands on scheduling. It is a per-query reorder of
-the displayed rows only; the stored fallback order is untouched.
+When the typed phrase reads as a reminder request — `IntentClassifier.standard` scores it `.reminder`
+off a keyword like "remind me" or "notify me", before any time is even typed — `FallbackCoordinator`
+asks `Fallback.prioritised` to float this row to the top of the fallback list so ↵ lands on scheduling.
+Intent classification is a shared `Features/Intent/` concern, not the scheduler's: every fallback maps
+to a `QueryIntent` through `Fallback.Builtin.intent`, so search, shell and AI rows promote the same
+way. It is a per-query reorder of the displayed rows only; the stored fallback order is untouched.
 
 ## Settings and backup
 

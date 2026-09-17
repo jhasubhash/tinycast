@@ -36,18 +36,6 @@ enum ReminderPhraseParser {
         return ParsedReminder(title: title, rule: rule)
     }
 
-    /// True when a phrase reads as a reminder request, before any time is typed, so the launcher can
-    /// float scheduling to the top. Keyword intent only — the full parse decides whether it fires.
-    static func signalsIntent(in text: String) -> Bool {
-        let lower = text.lowercased()
-        return intentMarkers.contains { lower.contains($0) }
-    }
-
-    private static let intentMarkers = [
-        "remind", "reminder", "notify me", "notification", "alert me",
-        "ping me", "wake me", "nudge me", "don't let me forget", "dont let me forget",
-    ]
-
     private static func clock(_ date: Date, _ calendar: Calendar) -> (hour: Int, minute: Int) {
         let parts = calendar.dateComponents([.hour, .minute], from: date)
         return (parts.hour ?? Recurrence.defaultClock.hour, parts.minute ?? Recurrence.defaultClock.minute)

@@ -25,13 +25,10 @@ final class FallbackCoordinator {
         let rows = available.filter(store.isEnabled).compactMap { fallback in
             entry(for: fallback).map { (fallback: fallback, entry: $0) }
         }
-        // A reminder-intent phrase floats scheduling to the top so ↵ lands on it, order untouched.
-        guard ReminderPhraseParser.signalsIntent(in: query),
-              let index = rows.firstIndex(where: { $0.fallback == .builtin(.scheduleReminder) })
-        else { return rows }
-        var promoted = rows
-        promoted.insert(promoted.remove(at: index), at: 0)
-        return promoted
+        // What the query reads as floats its fallback to the top; the stored order is untouched.
+        let intents = IntentClassifier.standard.ranked(query).map(\.intent)
+        let order = Fallback.prioritised(rows.map(\.fallback), forIntents: intents)
+        return order.compactMap { fallback in rows.first { $0.fallback == fallback } }
     }
 
     /// Nil for a quicklink deleted since the order was stored.

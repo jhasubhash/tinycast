@@ -18,10 +18,27 @@ enum Fallback: Hashable, Sendable {
             case .scheduleReminder: return .createScheduledTask
             }
         }
+
+        /// The typed-query intent that should float this fallback to the top, if any. The launcher
+        /// asks `IntentClassifier` what a query means, then promotes the fallbacks that answer to it.
+        var intent: QueryIntent? {
+            switch self {
+            case .aiChat: return .aiQuestion
+            case .searchFiles: return .fileSearch
+            case .runShellCommand: return .shellCommand
+            case .scheduleReminder: return .reminder
+            }
+        }
     }
 
     case builtin(Builtin)
     case quicklink(UUID)
+
+    /// The built-in behind this fallback, or nil for a quicklink — the intent map keys off it.
+    var builtin: Builtin? {
+        if case .builtin(let builtin) = self { return builtin }
+        return nil
+    }
 
     /// The row's `AppEntry` id, so a stored order outlives a rename and survives a reinstall.
     var id: String {
@@ -59,6 +76,18 @@ enum Fallback: Hashable, Sendable {
         var remaining = Dictionary(available.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let known = storedIDs.compactMap { remaining.removeValue(forKey: $0) }
         return known + available.filter { remaining[$0.id] != nil }
+    }
+
+    /// Floats the fallbacks whose intent the query expressed to the top, strongest intent first, and
+    /// keeps everything else in its given order below. A per-query view — the stored order is untouched.
+    static func prioritised(_ offered: [Fallback], forIntents ranked: [QueryIntent]) -> [Fallback] {
+        var front: [Fallback] = []
+        for intent in ranked {
+            for fallback in offered where fallback.builtin?.intent == intent && !front.contains(fallback) {
+                front.append(fallback)
+            }
+        }
+        return front + offered.filter { !front.contains($0) }
     }
 
     /// The section header. A long query is elided in the middle, so “with…” always survives.

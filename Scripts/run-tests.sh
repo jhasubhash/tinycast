@@ -265,7 +265,9 @@ run fallback-test          Tinycast/Features/Launcher/Model/Fallback.swift \
                            Tinycast/Features/Quicklinks/Model/Quicklink.swift \
                            Tinycast/Features/Quicklinks/Model/QuicklinkDestination.swift \
                            Tinycast/Features/SystemActions/Model/SystemAction.swift \
-                           Tinycast/Features/WindowManagement/Model/WindowCommand.swift
+                           Tinycast/Features/WindowManagement/Model/WindowCommand.swift \
+                           Tinycast/Features/Intent/Model/*.swift
+run intent-test            Tinycast/Features/Intent/Model/*.swift
 run hotkey-test            Tinycast/Features/HotKeys/Model/DoubleTapModifier.swift \
                            Tinycast/Features/HotKeys/Model/DoubleTapDetector.swift \
                            Tinycast/Features/HotKeys/Model/HyperKey.swift \

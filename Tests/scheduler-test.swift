@@ -29,7 +29,6 @@ struct SchedulerTests {
         reminderPhraseParserLiftsTitleFromRelativeTime()
         reminderPhraseParserReadsRecurrence()
         reminderPhraseParserRejectsTimelessPhrase()
-        reminderPhraseParserSignalsIntent()
 
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
@@ -265,17 +264,5 @@ struct SchedulerTests {
         expect(
             ReminderPhraseParser.parse("buy milk", now: baseCreatedAt, calendar: utcCalendar) == nil,
             "a phrase with no time and no recurrence has nothing to schedule")
-    }
-
-    static func reminderPhraseParserSignalsIntent() {
-        expect(
-            ReminderPhraseParser.signalsIntent(in: "remind me to drink water"),
-            "a bare 'remind me' phrase reads as reminder intent before any time is typed")
-        expect(
-            ReminderPhraseParser.signalsIntent(in: "notify me when the build is done"),
-            "'notify me' reads as reminder intent")
-        expect(
-            !ReminderPhraseParser.signalsIntent(in: "grep the logs for errors"),
-            "an unrelated command does not read as reminder intent")
     }
 }
