@@ -23,6 +23,7 @@ struct AppleIntelligenceTests {
         deltasFollowCumulativeSnapshots()
         turnsSplitThePromptFromItsHistory()
         generationErrorsBecomeReadableFailures()
+        schemaBridgeAcceptsToolParameters()
         await onDeviceModelAnswers()
 
         print("\(passes) passed, \(failures) failed")
@@ -126,6 +127,59 @@ struct AppleIntelligenceTests {
             AppleIntelligenceProvider.providerError(.decodingFailure(context))
                 == .malformedResponse,
             "a decoding failure is the shared malformed-response case")
+    }
+
+    /// The bridge must turn an arbitrary JSON-Schema tool into a schema FoundationModels accepts:
+    /// enums, optionals, and nested/array shapes each have their own failure mode in the framework.
+    static func schemaBridgeAcceptsToolParameters() {
+        let reminder = AITool(
+            name: "scheduler__create_reminder", description: "Schedule a notification.",
+            parameters: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "title": .object(["type": .string("string")]),
+                    "body": .object(["type": .string("string")]),
+                    "when": .object(["type": .string("string")]),
+                    "repeat": .object([
+                        "type": .string("string"),
+                        "enum": .array([.string("once"), .string("daily")]),
+                    ]),
+                ]),
+                "required": .array([.string("title"), .string("when")]),
+            ]),
+            origin: "Scheduler")
+        guard let encoded = try? JSONEncoder().encode(AppleIntelligenceToolSchema.schema(for: reminder)),
+            let json = String(data: encoded, encoding: .utf8)
+        else {
+            expect(false, "a reminder tool builds an encodable schema")
+            return
+        }
+        for property in ["title", "when", "repeat"] {
+            expect(json.contains(property), "the schema carries the \(property) property")
+        }
+        for choice in ["once", "daily"] {
+            expect(json.contains(choice), "the repeat enum keeps its \(choice) choice")
+        }
+
+        let nested = AITool(
+            name: "nested", description: "Nested shapes.",
+            parameters: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "tags": .object([
+                        "type": .string("array"),
+                        "items": .object(["type": .string("string")]),
+                    ]),
+                    "place": .object([
+                        "type": .string("object"),
+                        "properties": .object(["city": .object(["type": .string("string")])]),
+                    ]),
+                ]),
+            ]),
+            origin: "Test")
+        expect(
+            (try? AppleIntelligenceToolSchema.schema(for: nested)) != nil,
+            "an array-and-object tool builds without a schema error")
     }
 
     /// The real thing, end to end, when this Mac can run it.

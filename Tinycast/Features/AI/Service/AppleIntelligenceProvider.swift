@@ -5,9 +5,26 @@ import Foundation
 struct AppleIntelligenceProvider: AIProvider {
     /// The caller's, not a constant: the default filter refuses text the reader already wrote.
     let guardrails: SystemLanguageModel.Guardrails
+    /// Host tools the on-device session runs in-process, with the executor that fulfils each call.
+    /// Empty for a plain chat turn; `AIChatCoordinator` arms them when the feature is on.
+    private let hostTools: [AITool]
+    private let execute: (@Sendable (AIToolCall) async -> AIToolResult)?
 
-    init(guardrails: SystemLanguageModel.Guardrails = .default) {
+    init(
+        guardrails: SystemLanguageModel.Guardrails = .default,
+        hostTools: [AITool] = [],
+        execute: (@Sendable (AIToolCall) async -> AIToolResult)? = nil
+    ) {
         self.guardrails = guardrails
+        self.hostTools = hostTools
+        self.execute = execute
+    }
+
+    /// Arm the route with the host tools it runs itself; the loop model never wraps this provider.
+    func executingHostTools(
+        _ tools: [AITool], invoke: @escaping @Sendable (AIToolCall) async -> AIToolResult
+    ) -> AppleIntelligenceProvider {
+        AppleIntelligenceProvider(guardrails: guardrails, hostTools: tools, execute: invoke)
     }
 
     static func status() -> AppleIntelligenceStatus {
@@ -34,6 +51,7 @@ struct AppleIntelligenceProvider: AIProvider {
                     }
                     let session = LanguageModelSession(
                         model: SystemLanguageModel(guardrails: guardrails),
+                        tools: Self.sessionTools(hostTools, execute: execute, into: continuation),
                         transcript: turn.transcript)
                     let options = GenerationOptions(
                         maximumResponseTokens: min(
@@ -58,6 +76,19 @@ struct AppleIntelligenceProvider: AIProvider {
         }
     }
 
+    /// The FoundationModels tools for this turn, each reporting its call into the live stream. A tool
+    /// whose schema will not build is dropped rather than failing the turn.
+    private static func sessionTools(
+        _ tools: [AITool], execute: (@Sendable (AIToolCall) async -> AIToolResult)?,
+        into continuation: AIProviderStream.Continuation
+    ) -> [any Tool] {
+        guard let execute else { return [] }
+        return tools.compactMap {
+            try? AppleIntelligenceHostTool(
+                spec: $0, execute: execute, emit: { continuation.yield($0) })
+        }
+    }
+
     /// Split the way a session takes it: the newest user turn is the prompt, the rest a transcript.
     static func turn(for request: AIRequest) -> (prompt: String?, transcript: Transcript) {
         var entries: [Transcript.Entry] = []
@@ -77,7 +108,7 @@ struct AppleIntelligenceProvider: AIProvider {
                 entries.append(.prompt(Transcript.Prompt(segments: [segment])))
             case .assistant:
                 entries.append(.response(Transcript.Response(assetIDs: [], segments: [segment])))
-            // The on-device route offers no tools, so a tool turn can only be foreign history.
+            // A tool call resolves inside its own turn, so its result never replays as history.
             case .system, .tool:
                 continue
             }

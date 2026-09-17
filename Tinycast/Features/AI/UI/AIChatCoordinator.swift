@@ -240,17 +240,25 @@ final class AIChatCoordinator {
         var tools = core.mcpCoordinator.tools(scopedTo: slug, allowed: allowed)
         // The scheduler is offered as a native tool whenever the feature is on, MCP servers or not.
         if core.settings.schedulerEnabled { tools.append(SchedulerAITool.tool) }
-        guard capabilities.tools, !tools.isEmpty else { return provider }
+        guard !tools.isEmpty else { return provider }
         let chatID = chat.session.id
         let mcp = core.mcpCoordinator
         let store = core.scheduledTasks
-        return AIToolLoopProvider(base: provider, tools: tools) { [mcp, store] call in
+        let invoke: @Sendable (AIToolCall) async -> AIToolResult = { [mcp, store] call in
             if call.name == SchedulerAITool.name {
                 return await SchedulerAITool.invoke(
                     call, store: store, calendar: .current, now: Date())
             }
             return await mcp.invoke(call, in: chatID)
         }
+        // The HTTP routes hand calls back to the loop; the on-device model runs them in-process.
+        if capabilities.tools {
+            return AIToolLoopProvider(base: provider, tools: tools, invoke: invoke)
+        }
+        if let onDevice = provider as? AppleIntelligenceProvider {
+            return onDevice.executingHostTools(tools, invoke: invoke)
+        }
+        return provider
     }
 
     /// The server a draft is addressed to, so the composer can show it as a chip while typing.

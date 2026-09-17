@@ -251,6 +251,7 @@
 		57784875AA132F7756399363 /* SnippetsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41E419A4DA5AB5B3A87B80F2 /* SnippetsListView.swift */; };
 		57B8D2628E23D0D9BD8815AD /* MCPStdioTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5958B66BC7FD9FE3F2B8F49 /* MCPStdioTransport.swift */; };
 		58D369977E702AD66F070913 /* SnippetMarkdownSerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE3331A5E8F892CC257AD31B /* SnippetMarkdownSerializer.swift */; };
+		5910CBDE880FDD23D3021F79 /* AppleIntelligenceHostTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1008D64D711E38F3D463313 /* AppleIntelligenceHostTool.swift */; };
 		5970306ABC24B03028E66D45 /* FileSearchIgnoreList.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBFF39C46E98D0808B188E2E /* FileSearchIgnoreList.swift */; };
 		5A088F6FABE7A85699F94C2A /* SchedulerCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85CDE06420CA7B3BB2FB739B /* SchedulerCoordinator.swift */; };
 		5A91C58340D02ED0939BCAE2 /* CurrencyFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE35B5E7B1CC94F759116097 /* CurrencyFeed.swift */; };
@@ -1122,6 +1123,7 @@
 		9F9A0A3867D1B8E1D3284471 /* ExtensionNodeShims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionNodeShims.swift; sourceTree = "<group>"; };
 		A061D1B64684905BA0E998C5 /* ChatHistoryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistoryScreen.swift; sourceTree = "<group>"; };
 		A0BAA0471DD8CE4352F45FED /* ExtensionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionCoordinator.swift; sourceTree = "<group>"; };
+		A1008D64D711E38F3D463313 /* AppleIntelligenceHostTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleIntelligenceHostTool.swift; sourceTree = "<group>"; };
 		A1306524F57602D90FCF153C /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		A1627EDDB24B0DF14F46C71F /* ScheduleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleEngine.swift; sourceTree = "<group>"; };
 		A178C17DB989B6D2D71C021E /* ExtensionActionsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionActionsPanel.swift; sourceTree = "<group>"; };
@@ -1362,7 +1364,7 @@
 		FE41DC04958D7C2FF8C47F62 /* CustomCommandCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCommandCoordinator.swift; sourceTree = "<group>"; };
 		FE72CE02F853ACE956627347 /* SystemAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAction.swift; sourceTree = "<group>"; };
 		FF447647B325A119F2B3BCD1 /* UnitCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitCategory.swift; sourceTree = "<group>"; };
-		"TEMP_A999C4E9-45B4-42F2-B041-B9E2E6BDFFD6" /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+		"TEMP_963DAD6F-ADC7-4694-9856-A99EC20236F1" /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -3083,6 +3085,7 @@
 				848E14DE51403235A82BC287 /* AIProvider.swift */,
 				85DAEE77ABAC4260C95F9AB5 /* AIProviderFactory.swift */,
 				95E1C2AD9D1D83F90048FD8A /* AIToolLoopProvider.swift */,
+				A1008D64D711E38F3D463313 /* AppleIntelligenceHostTool.swift */,
 				06B5C0B83C3645AC90639B85 /* AppleIntelligenceProvider.swift */,
 				076A7476B8558DB20FD0700C /* AssistantSecretStore.swift */,
 				C6726BCE21D4FC9F5FEC72F7 /* AssistantStore.swift */,
@@ -3247,10 +3250,10 @@
 			path = Model;
 			sourceTree = "<group>";
 		};
-		"TEMP_BC50440E-99D3-4525-87F2-4619D836850E" /* tinycast */ = {
+		"TEMP_92E49B57-3E02-4F6F-A04B-FF244D9BC6FF" /* tinycast */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_A999C4E9-45B4-42F2-B041-B9E2E6BDFFD6" /* Signing.xcconfig */,
+				"TEMP_963DAD6F-ADC7-4694-9856-A99EC20236F1" /* Signing.xcconfig */,
 			);
 			path = tinycast;
 			sourceTree = "<group>";
@@ -3439,6 +3442,7 @@
 				6527B404C220924885C070B3 /* AppWindowController.swift in Sources */,
 				89B3CC1AB417D04CE39FB70C /* Appearance.swift in Sources */,
 				8477CC22949D92F8AC89DB7D /* AppleIntelligence.swift in Sources */,
+				5910CBDE880FDD23D3021F79 /* AppleIntelligenceHostTool.swift in Sources */,
 				F03DB7A7898F0388E821FDBB /* AppleIntelligenceProvider.swift in Sources */,
 				0CD06036347A6D96B1F7947F /* AppleShortcut.swift in Sources */,
 				050B0F0221560063469074EF /* AppleShortcutCoordinator.swift in Sources */,
@@ -4149,7 +4153,7 @@
 		};
 		5DD32DD22FF4D687291A2701 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_A999C4E9-45B4-42F2-B041-B9E2E6BDFFD6" /* Signing.xcconfig */;
+			baseConfigurationReference = "TEMP_963DAD6F-ADC7-4694-9856-A99EC20236F1" /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -4233,7 +4237,7 @@
 		};
 		CC3CD44A1E55885C69F58A29 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_A999C4E9-45B4-42F2-B041-B9E2E6BDFFD6" /* Signing.xcconfig */;
+			baseConfigurationReference = "TEMP_963DAD6F-ADC7-4694-9856-A99EC20236F1" /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;

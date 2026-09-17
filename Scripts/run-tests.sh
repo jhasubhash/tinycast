@@ -479,7 +479,8 @@ run quick-action-test      Tinycast/Features/Settings/AppSettingsKey.swift \
 run apple-intelligence-test Tinycast/Features/Settings/AppSettingsKey.swift \
                            Tinycast/Features/AI/Model/*.swift \
                            Tinycast/Features/AI/Service/AIProvider.swift \
-                           Tinycast/Features/AI/Service/AppleIntelligenceProvider.swift
+                           Tinycast/Features/AI/Service/AppleIntelligenceProvider.swift \
+                           Tinycast/Features/AI/Service/AppleIntelligenceHostTool.swift
 run slow mcp-stdio-test    Tinycast/Platform/ExecutableLocator.swift \
                            Tinycast/Platform/KeychainSecretStore.swift \
                            Tinycast/Features/Settings/AppSettingsKey.swift \

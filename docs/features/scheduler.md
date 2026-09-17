@@ -101,6 +101,13 @@ Whenever the feature is on, `AIChatCoordinator` offers `SchedulerAITool` to the 
 MCP tools. It creates a notification-only task from a natural-language time, so the assistant can set
 a reminder — but, by the [invariant above](#invariants), it can never schedule a script.
 
+The tool reaches every route that runs host tools, not just the HTTP ones. An API connection hands
+each call back through `AIToolLoopProvider`; the on-device Apple Intelligence model instead runs it
+in-process, so `toolAware` arms `AppleIntelligenceProvider.executingHostTools`.
+`AppleIntelligenceHostTool` bridges the `AITool` onto a `FoundationModels.Tool` — its
+`AppleIntelligenceToolSchema` turns the JSON-Schema parameters into a `GenerationSchema`, and each
+call reports a `.toolCall`/`.toolResult` pair into the same stream a loop route would.
+
 ## Settings and backup
 
 `schedulerEnabled` and `schedulerShowInLauncher` live in `AppSettings`/`AppSettingsKey`.
