@@ -1,3 +1,5 @@
+# It's hard to maintian this fork since upstream is being force pushed repeatedly. 
+
 # Tinycast
 
 **A tiny, fully native macOS launcher. One hotkey, everything you reach for all day, under 100 MB of
