@@ -37,8 +37,31 @@ git push origin main
 ```
 
 Merge, not rebase: it keeps every original commit SHA so the push stays an ordinary fast-forward.
-`git rerere` is on, so a resolution recorded once replays next merge. Push as `jhasubhash` — the active
-`gh` account may differ.
+`git rerere` is now enabled locally (`git config --local rerere.enabled true`), so a resolution
+recorded once replays next merge — earlier docs claimed it was on when it was not. Push as
+`jhasubhash` — the active `gh` account may differ.
+
+### When upstream force-pushed (rewritten history)
+
+Upstream periodically **rebases and force-pushes** `main`, so every commit gets a new SHA. After
+`git fetch upstream` prints `forced-update` and the fork suddenly reads hundreds of commits "behind"
+(GitHub's compare page balloons) even though you merged upstream only recently, the divergence is an
+*ancestry* break, not a content one — `main` already holds that content under the old SHAs. A normal
+`git merge upstream/main` then explodes into hundreds of spurious `add/add` conflicts (the shared
+merge base falls back to an ancient commit). Do **not** grind through them. Re-record the merge with
+ours, keeping `main`'s tree exactly:
+
+```sh
+git fetch upstream
+git merge -s ours upstream/main \
+    -m "Merge upstream/main (rewritten history; content already present, keep ours)"
+# 0 conflicts; `git merge-base --is-ancestor upstream/main main` is now true → 0 behind
+git push origin main
+```
+
+Caveat: `-s ours` does **not** pull in upstream commits that are genuinely newer than your last real
+merge — it keeps your tree as-is. Cherry-pick the specific new features you want afterward
+(`git log <last-real-merge>..upstream/main`), each a small targeted merge rather than a 200-file one.
 
 ## Local build and signing
 
