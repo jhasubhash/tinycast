@@ -1,4 +1,4 @@
-# It's hard to maintian this fork since upstream is being force pushed repeatedly. 
+# It's hard to maintain this fork since upstream is being force pushed repeatedly. 
 
 # Tinycast
 
