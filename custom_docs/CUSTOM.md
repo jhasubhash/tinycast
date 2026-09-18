@@ -24,44 +24,36 @@ exactly this fork's delta, which the register below mirrors.
 
 ## Pulling in upstream
 
-No automation — do it by hand:
+One command handles it, including upstream's frequent force-pushes:
 
 ```sh
-git fetch upstream
-git merge upstream/main
-# resolve, then rebuild — a clean merge is not a working build
+./Scripts/sync-upstream.sh
+# then rebuild — a clean merge is not a working build — and push as jhasubhash
 xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Debug \
     -derivedDataPath build/DerivedData build
 ./Scripts/run-tests.sh
 git push origin main
 ```
 
+The script fetches upstream, then probes the merge: a genuinely new, conflict-free advance is merged
+normally; a rewritten history is re-recorded with `-s ours` (0 conflicts) and the upstream commits it
+did **not** pull are printed so you can cherry-pick the features you want. It refuses on a dirty tree.
+
 Merge, not rebase: it keeps every original commit SHA so the push stays an ordinary fast-forward.
-`git rerere` is now enabled locally (`git config --local rerere.enabled true`), so a resolution
-recorded once replays next merge — earlier docs claimed it was on when it was not. Push as
-`jhasubhash` — the active `gh` account may differ.
+`git rerere` is enabled locally (`git config --local rerere.enabled true`), so a resolution recorded
+once replays next merge — earlier docs claimed it was on when it was not. Push as `jhasubhash` — the
+active `gh` account may differ.
 
-### When upstream force-pushed (rewritten history)
+### Why the script exists: upstream force-pushes
 
-Upstream periodically **rebases and force-pushes** `main`, so every commit gets a new SHA. After
-`git fetch upstream` prints `forced-update` and the fork suddenly reads hundreds of commits "behind"
-(GitHub's compare page balloons) even though you merged upstream only recently, the divergence is an
-*ancestry* break, not a content one — `main` already holds that content under the old SHAs. A normal
-`git merge upstream/main` then explodes into hundreds of spurious `add/add` conflicts (the shared
-merge base falls back to an ancient commit). Do **not** grind through them. Re-record the merge with
-ours, keeping `main`'s tree exactly:
-
-```sh
-git fetch upstream
-git merge -s ours upstream/main \
-    -m "Merge upstream/main (rewritten history; content already present, keep ours)"
-# 0 conflicts; `git merge-base --is-ancestor upstream/main main` is now true → 0 behind
-git push origin main
-```
-
-Caveat: `-s ours` does **not** pull in upstream commits that are genuinely newer than your last real
-merge — it keeps your tree as-is. Cherry-pick the specific new features you want afterward
-(`git log <last-real-merge>..upstream/main`), each a small targeted merge rather than a 200-file one.
+Upstream periodically **rebases and force-pushes** `main`, so every commit gets a new SHA (`git fetch
+upstream` prints `forced-update`) while the content stays the same. The fork then suddenly reads
+hundreds of commits "behind" — GitHub's compare page balloons — even though you merged upstream only
+recently. That divergence is an *ancestry* break, not a content one: `main` already holds the content
+under the old SHAs. A bare `git merge upstream/main` falls back to an ancient shared base and explodes
+into hundreds of spurious `add/add` conflicts over content you already have; never grind through them,
+let the script re-record with `-s ours` instead. Its one caveat — `-s ours` does not pull upstream
+commits genuinely newer than your last real merge — is why it prints that list to cherry-pick from.
 
 ## Local build and signing
 
